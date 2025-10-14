@@ -181,7 +181,7 @@ fn init_session(mut commands: Commands) {
 }
 
 fn setup_camera(mut commands: Commands) {
-  commands.spawn(Camera2d);
+  commands.spawn((Camera2d, IsDefaultUiCamera));
 }
 
 fn transition_to_playing(_ev: Trigger<IndigaugeInitDoneEvent>, mut state: ResMut<NextState<GameState>>) {
@@ -373,10 +373,10 @@ fn check_for_collisions(
         ig_info!("score.increase", { "score" : &**score });
       }
 
-      if **score > 4 {
-        let b = maybe_brick.unwrap();
-        dbg!("Should panic");
-      }
+      // if **score > 4 {
+      //   let b = maybe_brick.unwrap();
+      //   dbg!("Should panic");
+      // }
 
       // Reflect the ball's velocity when it collides
       let mut reflect_x = false;

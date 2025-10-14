@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::{
   api_types::{ApiResponse, EventPayload, EventPayloadCtx, StartSessionPayload, StartSessionResponse},
+  feedback::{FeedbackPanelVisible, FeedbackUiPlugin},
   observers::{observe_start_session_event, on_start_session_error, on_start_session_response},
   resources::{
     IndigaugeConfig, IndigaugeLogLevel, LastSentRequestInstant, SessionApiKey,
@@ -28,6 +29,7 @@ use crate::{
 };
 
 mod api_types;
+pub mod feedback;
 mod observers;
 pub mod resources;
 pub mod sysparam;
@@ -117,6 +119,8 @@ impl Plugin for IndigaugePlugin {
 
     app
       .add_plugins(ReqwestPlugin::default())
+      .add_plugins(FeedbackUiPlugin)
+      .insert_resource(FeedbackPanelVisible(true))
       .add_event::<StartSessionEvent>()
       .insert_resource(self.log_level.clone())
       .insert_resource(BufferedEvents::default())
