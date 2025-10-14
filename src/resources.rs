@@ -67,3 +67,12 @@ impl LastSentRequestInstant {
     }
   }
 }
+
+#[derive(Resource, PartialEq, PartialOrd, Clone)]
+pub enum IndigaugeLogLevel {
+  Debug,
+  Info,
+  Warn,
+  Error,
+  Silent,
+}

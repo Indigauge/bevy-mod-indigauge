@@ -4,7 +4,7 @@ use bevy::{diagnostic::SystemInfo, prelude::*};
 use bevy_mod_reqwest::{ReqwestErrorEvent, ReqwestResponseEvent};
 
 use crate::{
-  GLOBAL_TX, IndigaugeInitDoneEvent, SESSION_START_INSTANT, SessionApiKey, StartSessionEvent,
+  GLOBAL_TX, IndigaugeInitDoneEvent, IndigaugeLogLevel, SESSION_START_INSTANT, SessionApiKey, StartSessionEvent,
   api_types::{ApiResponse, StartSessionPayload, StartSessionResponse},
   resources::IndigaugeConfig,
   sysparam::BevyIndigauge,
@@ -18,7 +18,9 @@ pub fn observe_start_session_event(
   sys_info: Res<SystemInfo>,
 ) {
   if SESSION_START_INSTANT.get().is_some() {
-    warn!("Session already started");
+    if *ig.log_level <= IndigaugeLogLevel::Warn {
+      warn!("Session already started");
+    }
     cmd.trigger(IndigaugeInitDoneEvent::Skipped("Session already started".to_string()));
     return;
   }
@@ -71,9 +73,12 @@ pub fn on_start_session_response(
   trigger: Trigger<ReqwestResponseEvent>,
   mut commands: Commands,
   ig_config: Res<IndigaugeConfig>,
+  log_level: Res<IndigaugeLogLevel>,
 ) {
   let Ok(response) = trigger.event().deserialize_json::<ApiResponse<StartSessionResponse>>() else {
-    error!("Failed to deserialize response");
+    if *log_level <= IndigaugeLogLevel::Error {
+      error!("Failed to deserialize response");
+    }
     commands.trigger(IndigaugeInitDoneEvent::UnexpectedFailure("Failed to deserialize response".to_string()));
     return;
   };
@@ -82,12 +87,17 @@ pub fn on_start_session_response(
     ApiResponse::Ok(response) => {
       let start_instant = Instant::now();
       if let Err(set_start_instance_err) = SESSION_START_INSTANT.set(start_instant) {
-        error!(message = "Failed to set session start instant", error = ?set_start_instance_err);
+        if *log_level <= IndigaugeLogLevel::Error {
+          error!(message = "Failed to set session start instant", error = ?set_start_instance_err);
+        }
         commands.trigger(IndigaugeInitDoneEvent::Failure("Failed to set session start instant".to_string()));
         return;
       }
 
-      info!(message = "Indigauge session started", start_instant = ?start_instant);
+      if *log_level <= IndigaugeLogLevel::Info {
+        info!(message = "Indigauge session started", start_instant = ?start_instant);
+      }
+
       let key = response.session_token.clone();
 
       #[cfg(feature = "panic_handler")]
@@ -102,13 +112,21 @@ pub fn on_start_session_response(
       commands.trigger(IndigaugeInitDoneEvent::Success);
     },
     ApiResponse::Err(error_body) => {
-      error!(message = "Failed to start session", error_code = error_body.code, error_message = error_body.message);
+      if *log_level <= IndigaugeLogLevel::Error {
+        error!(message = "Failed to start session", error_code = error_body.code, error_message = error_body.message);
+      }
       commands.trigger(IndigaugeInitDoneEvent::Failure("Failed to start session".to_string()));
     },
   }
 }
 
-pub fn on_start_session_error(trigger: Trigger<ReqwestErrorEvent>, mut commands: Commands) {
-  error!(message = "Create session post request failed", error = ?trigger.event().0);
+pub fn on_start_session_error(
+  trigger: Trigger<ReqwestErrorEvent>,
+  mut commands: Commands,
+  log_level: Res<IndigaugeLogLevel>,
+) {
+  if *log_level <= IndigaugeLogLevel::Error {
+    error!(message = "Create session post request failed", error = ?trigger.event().0);
+  }
   commands.trigger(IndigaugeInitDoneEvent::Failure("Create session post request failed".to_string()));
 }

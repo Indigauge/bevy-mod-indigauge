@@ -3,8 +3,9 @@ use std::{panic::PanicHookInfo, time::Instant};
 use serde_json::json;
 
 use crate::{
-  SESSION_START_INSTANT,
+  GLOBAL_TX, SESSION_START_INSTANT,
   api_types::{EventPayload, EventPayloadCtx},
+  resources::events::QueuedEvent,
 };
 
 pub(crate) fn bucket_cores(n: u32) -> &'static str {
@@ -236,5 +237,45 @@ pub fn panic_handler(host_origin: String, session_api_key: String) -> impl Fn(&P
         .header("X-Indigauge-Key", &session_api_key)
         .send_json(&json!({"reason": "crashed"}));
     }
+  }
+}
+
+#[inline]
+pub fn enqueue(
+  level: &'static str,
+  event_type: &str,
+  metadata: Option<serde_json::Value>,
+  file: &'static str,
+  line: u32,
+  module: &'static str,
+) -> bool {
+  let tx = match GLOBAL_TX.get() {
+    Some(tx) => tx.clone(),
+    None => return false, // ikke initialisert enda
+  };
+
+  if let Some(start_instant) = SESSION_START_INSTANT.get() {
+    let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
+    let module = if module.is_empty() { None } else { Some(module) };
+
+    let context = matches!(level, "warn" | "error").then(|| EventPayloadCtx {
+      file: file.to_string(),
+      line,
+      module,
+    });
+
+    let payload = EventPayload {
+      level,
+      event_type: event_type.to_string(),
+      elapsed_ms,
+      metadata,
+      idempotency_key: None,
+      context,
+    };
+
+    // Bounded channel: send uten await (best effort)
+    tx.try_send(QueuedEvent::new(payload)).is_ok()
+  } else {
+    false
   }
 }

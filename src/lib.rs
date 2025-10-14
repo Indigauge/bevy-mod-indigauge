@@ -21,14 +21,11 @@ use crate::{
   api_types::{ApiResponse, EventPayload, EventPayloadCtx, StartSessionPayload, StartSessionResponse},
   observers::{observe_start_session_event, on_start_session_error, on_start_session_response},
   resources::{
-    IndigaugeConfig, LastSentRequestInstant, SessionApiKey,
+    IndigaugeConfig, IndigaugeLogLevel, LastSentRequestInstant, SessionApiKey,
     events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
   },
   sysparam::BevyIndigauge,
 };
-
-#[cfg(feature = "panic_handler")]
-use crate::utils::panic_handler;
 
 mod api_types;
 mod observers;
@@ -60,6 +57,7 @@ pub struct IndigaugePlugin {
   game_name: String,
   game_version: String,
   enabled: bool,
+  log_level: IndigaugeLogLevel,
 }
 
 impl IndigaugePlugin {
@@ -68,8 +66,13 @@ impl IndigaugePlugin {
       public_key,
       game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
       game_version,
-      enabled: true,
+      ..Default::default()
     }
+  }
+
+  pub fn log_level(mut self, log_level: IndigaugeLogLevel) -> Self {
+    self.log_level = log_level;
+    self
   }
 
   pub fn enabled(mut self, enabled: bool) -> Self {
@@ -88,6 +91,7 @@ impl Default for IndigaugePlugin {
       }),
       game_version: env!("CARGO_PKG_VERSION").to_string(),
       enabled: true,
+      log_level: IndigaugeLogLevel::Info,
     }
   }
 }
@@ -98,7 +102,9 @@ impl Plugin for IndigaugePlugin {
 
     if self.enabled {
       if config.public_key.is_empty() {
-        warn!("Indigauge public key is not set");
+        if self.log_level <= IndigaugeLogLevel::Warn {
+          warn!("Indigauge public key is not set");
+        }
       } else {
         if GLOBAL_TX.get().is_none() {
           let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
@@ -112,6 +118,7 @@ impl Plugin for IndigaugePlugin {
     app
       .add_plugins(ReqwestPlugin::default())
       .add_event::<StartSessionEvent>()
+      .insert_resource(self.log_level.clone())
       .insert_resource(BufferedEvents::default())
       .insert_resource(LastSentRequestInstant::new())
       .add_observer(observe_start_session_event)
@@ -160,57 +167,22 @@ where
   });
 }
 
-fn handle_queued_events(receiver: Res<EventQueueReceiver>, mut buffered_events: ResMut<BufferedEvents>) {
+fn handle_queued_events(
+  receiver: Res<EventQueueReceiver>,
+  mut buffered_events: ResMut<BufferedEvents>,
+  log_level: Res<IndigaugeLogLevel>,
+) {
   for event in receiver.try_iter() {
     match event.validate() {
       Ok(_) => {
         buffered_events.events.push(event);
       },
       Err(err) => {
-        error!("Invalid event: {}", err);
+        if *log_level <= IndigaugeLogLevel::Error {
+          error!("Invalid event: {}", err);
+        }
       },
     }
-  }
-}
-
-/// Kalles av makroene. Returnerer bool om enqueuing lyktes (kan brukes hvis du vil telle droppede events).
-#[inline]
-pub fn enqueue(
-  level: &'static str,
-  event_type: &str,
-  metadata: Option<serde_json::Value>,
-  file: &'static str,
-  line: u32,
-  module: &'static str,
-) -> bool {
-  let tx = match GLOBAL_TX.get() {
-    Some(tx) => tx.clone(),
-    None => return false, // ikke initialisert enda
-  };
-
-  if let Some(start_instant) = SESSION_START_INSTANT.get() {
-    let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
-    let module = if module.is_empty() { None } else { Some(module) };
-
-    let context = matches!(level, "warn" | "error").then(|| EventPayloadCtx {
-      file: file.to_string(),
-      line,
-      module,
-    });
-
-    let payload = EventPayload {
-      level,
-      event_type: event_type.to_string(),
-      elapsed_ms,
-      metadata,
-      idempotency_key: None,
-      context,
-    };
-
-    // Bounded channel: send uten await (best effort)
-    tx.try_send(QueuedEvent::new(payload)).is_ok()
-  } else {
-    false
   }
 }
 
@@ -218,24 +190,26 @@ pub fn enqueue(
 Makroer – tracing-lignende
 =========================== */
 
-pub mod macros {
+mod internal_macros {
   #[macro_export]
-  macro_rules! enqueue_event {
+  macro_rules! enqueue_ig_event {
     ($level: ident, $etype:expr, $metadata:expr) => {
       const _VALID: &str = $crate::utils::validate_event_type($etype);
-      let _ = $crate::enqueue(stringify!($level), $etype, $metadata, file!(), line!(), module_path!());
+      let _ = $crate::utils::enqueue(stringify!($level), $etype, $metadata, file!(), line!(), module_path!());
     };
   }
+}
 
+pub mod macros {
   /// Usage example: ig_event!(info, "ui.click", { "button": btn_id, "x": x, "y": y });
   #[macro_export]
   macro_rules! ig_event {
     ($level:ident, $etype:expr $(,)?) => {{
-      $crate::enqueue_event!($level, $etype, None);
+      $crate::enqueue_ig_event!($level, $etype, None);
     }};
     ($level:ident, $etype:expr $(, { $($key:tt : $value:expr),* $(,)? })? ) => {{
       let meta = serde_json::json!({ $($($key : $value),*)? });
-      $crate::enqueue_event!($level, $etype, Some(meta));
+      $crate::enqueue_ig_event!($level, $etype, Some(meta));
     }};
   }
 

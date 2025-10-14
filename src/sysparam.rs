@@ -10,9 +10,9 @@ use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::LastSentRequestInstant;
 use crate::api_types::BatchEventPayload;
 use crate::resources::events::BufferedEvents;
+use crate::{IndigaugeLogLevel, LastSentRequestInstant};
 use crate::{SessionApiKey, resources::IndigaugeConfig};
 
 #[derive(SystemParam)]
@@ -21,6 +21,7 @@ pub struct BevyIndigauge<'w, 's> {
   pub config: Res<'w, IndigaugeConfig>,
   pub buffered_events: ResMut<'w, BufferedEvents>,
   pub last_sent_request: ResMut<'w, LastSentRequestInstant>,
+  pub log_level: Res<'w, IndigaugeLogLevel>,
 }
 
 impl<'w, 's> BevyIndigauge<'w, 's> {
@@ -63,10 +64,10 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
         .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
           dbg!(trigger.event().body());
         })
-        .on_error(|trigger: Trigger<ReqwestErrorEvent>| {
-          dbg!(&trigger.event().0);
-          error!("Failed to send event batch");
-          // commands.trigger(IndigaugeInitDoneEvent::Failure);
+        .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+          if *log_level <= IndigaugeLogLevel::Error {
+            error!(message = "Failed to send event batch", error = ?trigger.event().0);
+          }
         });
     }
 
@@ -82,10 +83,10 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
         .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
           dbg!("heartbeat response: {:?}", trigger.event().body());
         })
-        .on_error(|trigger: Trigger<ReqwestErrorEvent>| {
-          dbg!(&trigger.event().0);
-          error!("Failed to send session heartbeat");
-          // commands.trigger(IndigaugeInitDoneEvent::Failure);
+        .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+          if *log_level <= IndigaugeLogLevel::Error {
+            error!(message = "Failed to send session heartbeat", error = ?trigger.event().0);
+          }
         });
     }
   }
