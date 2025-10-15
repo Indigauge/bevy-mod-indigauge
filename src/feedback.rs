@@ -25,31 +25,49 @@ const LINE_HEIGHT: f32 = 21.;
 pub enum FeedbackCategory {
   #[default]
   General,
-  UI,
+  Ui,
   Gameplay,
   Performance,
   Bugs,
+  Controls,
+  Audio,
+  Balance,
+  Graphics,
+  Visual,
+  Art,
   Other,
 }
 
 impl FeedbackCategory {
   pub const ALL: &'static [FeedbackCategory] = &[
     FeedbackCategory::General,
-    FeedbackCategory::UI,
+    FeedbackCategory::Ui,
     FeedbackCategory::Gameplay,
     FeedbackCategory::Performance,
     FeedbackCategory::Bugs,
+    FeedbackCategory::Controls,
+    FeedbackCategory::Audio,
+    FeedbackCategory::Balance,
+    FeedbackCategory::Graphics,
+    FeedbackCategory::Visual,
+    FeedbackCategory::Art,
     FeedbackCategory::Other,
   ];
 
   pub fn label(&self) -> &'static str {
     match self {
       FeedbackCategory::General => "General",
-      FeedbackCategory::UI => "UI",
+      FeedbackCategory::Ui => "UI",
       FeedbackCategory::Gameplay => "Gameplay",
       FeedbackCategory::Performance => "Performance",
       FeedbackCategory::Bugs => "Bugs",
       FeedbackCategory::Other => "Other",
+      FeedbackCategory::Controls => "Controls",
+      FeedbackCategory::Audio => "Audio",
+      FeedbackCategory::Balance => "Balance",
+      FeedbackCategory::Graphics => "Graphics",
+      FeedbackCategory::Visual => "Visual",
+      FeedbackCategory::Art => "Art",
     }
   }
 }
@@ -120,7 +138,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
       },
     )
     .with_children(|root| {
-      // Panel/kort
+      // Panel/card
       root
         .spawn((
           Node {
@@ -135,14 +153,14 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
           panel(styles.background, styles.border),
         ))
         .with_children(|child_panel| {
-          // Tittel
+          // Title
           child_panel
             .spawn((Text::default(), Node::default()))
             .with_children(|t| {
               t.spawn((TextSpan::new("Send feedback"), TextFont::from_font_size(22.), TextColor(styles.text_primary)));
             });
 
-          // Rad: kategori + rating
+          // Category
           child_panel
             .spawn((
               Node {
@@ -155,7 +173,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
               BackgroundColor(Color::NONE),
             ))
             .with_children(|row| {
-              // Kategori-knapp
+              // Category button
               row
                 .spawn((
                   Node {
@@ -222,19 +240,27 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
               //   });
             });
 
-          // Dropdown-liste (skjult til å begynne med)
+          // Dropdown-list (hidden as default)
           child_panel
             .spawn((
               Node {
-                width: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
+                width: Val::Px(318.0),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                justify_content: JustifyContent::SpaceBetween,
                 row_gap: Val::Px(4.0),
                 padding: UiRect::all(Val::Px(8.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 display: Display::None,
+                position_type: PositionType::Absolute,
+                top: Val::Px(110.0),
+                left: Val::Px(49.0),
                 ..default()
               },
-              BorderColor(styles.surface),
+              BackgroundColor(styles.background),
+              BorderColor(styles.border),
+              BorderRadius::bottom(Val::Px(8.)),
+              ZIndex(10),
               CategoryList,
             ))
             .with_children(|list| {
@@ -242,8 +268,10 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
                 list
                   .spawn((
                     Node {
+                      width: Val::Percent(48.0),
                       border: UiRect::all(Val::Px(1.0)),
                       padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
+                      justify_content: JustifyContent::Center,
                       ..default()
                     },
                     CategoryItem(*cat),
@@ -261,7 +289,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
               }
             });
 
-          // Tekstinput-område
+          // Text-input area
           child_panel
             .spawn((Node {
               width: Val::Percent(100.0),
@@ -303,7 +331,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
                         TextColor(styles.text_secondary.with_alpha(0.4)),
                       ));
                     });
-                  // Faktisk innhold
+                  // Actual content
                   field
                     .spawn((
                       Node {
@@ -327,7 +355,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
                 });
             });
 
-          // Toggle + submit
+          // Screenshot toggle
           child_panel
             .spawn((
               Node {
@@ -362,7 +390,7 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, sty
                 });
             });
 
-          // Buttons
+          // Submit and cancel buttons
           child_panel
             .spawn((
               Node {
