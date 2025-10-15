@@ -3,6 +3,15 @@ use bevy::prelude::*;
 use crate::feedback::FeedbackCategory;
 
 #[derive(Resource, Debug)]
+pub struct FeedbackKeyCodeToggle(pub KeyCode);
+
+impl Default for FeedbackKeyCodeToggle {
+  fn default() -> Self {
+    Self(KeyCode::F2)
+  }
+}
+
+#[derive(Resource, Debug)]
 pub struct FeedbackPanelStyles {
   pub primary: Color,
   pub primary_hover: Color,
@@ -42,22 +51,33 @@ impl Default for FeedbackPanelStyles {
 #[derive(Resource, Default)]
 pub struct FeedbackPanelProps {
   pub(crate) question: Option<String>,
+  pub(crate) category: Option<FeedbackCategory>,
   pub(crate) visible: bool,
+  pub(crate) allow_screenshot: bool,
 }
 
 impl FeedbackPanelProps {
-  pub fn with_question(question: impl Into<String>) -> Self {
+  pub fn with_question(question: impl Into<String>, category: FeedbackCategory) -> Self {
     Self {
       question: Some(question.into()),
-      visible: false,
+      category: Some(category),
+      visible: true,
+      allow_screenshot: true,
     }
   }
 
   pub fn visible() -> Self {
     Self {
       question: None,
+      category: None,
       visible: true,
+      allow_screenshot: true,
     }
+  }
+
+  pub fn allow_screenshot(mut self, allow_screenshot: bool) -> Self {
+    self.allow_screenshot = allow_screenshot;
+    self
   }
 }
 
@@ -67,4 +87,5 @@ pub struct FeedbackFormState {
   pub category: FeedbackCategory, // dropdown-valg
   pub include_screenshot: bool,
   pub dropdown_open: bool,
+  pub question: Option<String>,
 }

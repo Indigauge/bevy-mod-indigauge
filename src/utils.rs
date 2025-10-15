@@ -8,6 +8,10 @@ use crate::{
   resources::events::QueuedEvent,
 };
 
+pub fn select<T>(true_case: T, false_case: T, condition: bool) -> T {
+  if condition { true_case } else { false_case }
+}
+
 pub(crate) fn bucket_cores(n: u32) -> &'static str {
   match n {
     0..=2 => "1-2",

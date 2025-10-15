@@ -5,7 +5,7 @@ use bevy::{
   prelude::*,
 };
 use bevy_mod_indigauge::{
-  IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, feedback::FeedbackPanelProps, ig_info,
+  FeedbackCategory, FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info,
 };
 
 // These constants are defined in `Transform` units.
@@ -63,7 +63,6 @@ fn main() {
         .add_plugins(IndigaugePlugin::default())
         .insert_resource(Score(0))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
-        .insert_resource(FeedbackPanelProps::visible())
         .add_event::<CollisionEvent>()
         .add_systems(Startup, setup_camera)
         .add_systems(OnEnter(GameState::InitializeSession), init_session)
@@ -198,6 +197,8 @@ fn setup_game(
   mut materials: ResMut<Assets<ColorMaterial>>,
   asset_server: Res<AssetServer>,
 ) {
+  commands.insert_resource(FeedbackPanelProps::visible());
+
   // Sound
   let ball_collision_sound = asset_server.load("sounds/breakout_collision.ogg");
   commands.insert_resource(CollisionSound(ball_collision_sound));

@@ -28,7 +28,9 @@ pub mod utils;
 
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
 pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
-const SESSION_KEY_EXPIRY_MS: u128 = 6 * 60 * 60 * 1000;
+
+pub use feedback::resources::FeedbackPanelProps;
+pub use feedback::ui_elements::FeedbackCategory;
 
 #[derive(Event, Default)]
 pub struct StartSessionEvent {
@@ -142,7 +144,7 @@ where
 Makroer – tracing-lignende
 =========================== */
 
-mod internal_macros {
+pub mod macros {
   #[macro_export]
   macro_rules! enqueue_ig_event {
     ($level: ident, $etype:expr, $metadata:expr) => {
@@ -150,9 +152,7 @@ mod internal_macros {
       let _ = $crate::utils::enqueue(stringify!($level), $etype, $metadata, file!(), line!(), module_path!());
     };
   }
-}
 
-pub mod macros {
   /// Usage example: ig_event!(info, "ui.click", { "button": btn_id, "x": x, "y": y });
   #[macro_export]
   macro_rules! ig_event {

@@ -1,6 +1,55 @@
 use bevy::prelude::*;
 
-use crate::feedback::FeedbackCategory;
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
+pub enum FeedbackCategory {
+  #[default]
+  General,
+  Ui,
+  Gameplay,
+  Performance,
+  Bugs,
+  Controls,
+  Audio,
+  Balance,
+  Graphics,
+  Visual,
+  Art,
+  Other,
+}
+
+impl FeedbackCategory {
+  pub const ALL: &'static [FeedbackCategory] = &[
+    FeedbackCategory::General,
+    FeedbackCategory::Ui,
+    FeedbackCategory::Gameplay,
+    FeedbackCategory::Performance,
+    FeedbackCategory::Bugs,
+    FeedbackCategory::Controls,
+    FeedbackCategory::Audio,
+    FeedbackCategory::Balance,
+    FeedbackCategory::Graphics,
+    FeedbackCategory::Visual,
+    FeedbackCategory::Art,
+    FeedbackCategory::Other,
+  ];
+
+  pub fn label(&self) -> &'static str {
+    match self {
+      FeedbackCategory::General => "General",
+      FeedbackCategory::Ui => "UI",
+      FeedbackCategory::Gameplay => "Gameplay",
+      FeedbackCategory::Performance => "Performance",
+      FeedbackCategory::Bugs => "Bugs",
+      FeedbackCategory::Other => "Other",
+      FeedbackCategory::Controls => "Controls",
+      FeedbackCategory::Audio => "Audio",
+      FeedbackCategory::Balance => "Balance",
+      FeedbackCategory::Graphics => "Graphics",
+      FeedbackCategory::Visual => "Visual",
+      FeedbackCategory::Art => "Art",
+    }
+  }
+}
 
 #[derive(Component)]
 pub struct OriginalButtonStyles {
@@ -26,11 +75,13 @@ pub struct FeedbackPanelCard;
 pub struct FeedbackPanel;
 
 #[derive(Component)]
-#[require(InputState, HoldPressed)]
 pub struct MessageInput;
 
 #[derive(Component)]
 pub struct MessageTextRoot;
+
+#[derive(Component)]
+pub struct QuestionTextRoot;
 
 #[derive(Component)]
 pub struct PlaceholderTextRoot;
@@ -73,6 +124,7 @@ pub struct Active;
 pub struct InputState {
   pub focused: bool,
   pub content: String,
+  pub cursor_position: usize,
 }
 
 pub fn panel(background_color: Color, border_color: Color) -> impl Bundle {

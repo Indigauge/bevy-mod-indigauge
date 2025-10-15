@@ -391,6 +391,7 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_mod_reqwest",
+ "bevy_text_edit",
  "cookie_store",
  "crossbeam-channel",
  "dirs",
@@ -1167,6 +1168,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_support_misc"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "738665c054d94f3ab07e25ebcf4e5f7b1e6588ddfe19d2cf8c24e6eb8f0fa045"
+dependencies = [
+ "bevy",
+]
+
+[[package]]
 name = "bevy_tasks"
 version = "0.15.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1207,6 +1217,17 @@ dependencies = [
  "smallvec",
  "sys-locale",
  "unicode-bidi",
+]
+
+[[package]]
+name = "bevy_text_edit"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f34327a064da7b4fa0b7f22ce9811bfb7136cd53d1f3d117fc546a443708e73b"
+dependencies = [
+ "bevy",
+ "bevy_support_misc",
+ "regex-lite",
 ]
 
 [[package]]
@@ -4158,6 +4179,12 @@ dependencies = [
  "memchr",
  "regex-syntax",
 ]
+
+[[package]]
+name = "regex-lite"
+version = "0.1.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d942b98df5e658f56f20d592c7f868833fe38115e65c33003d8cd224b0155da"
 
 [[package]]
 name = "regex-syntax"
