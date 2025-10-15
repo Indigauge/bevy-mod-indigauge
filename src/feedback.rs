@@ -4,16 +4,22 @@ use bevy::{
     keyboard::{Key, KeyCode, KeyboardInput},
     mouse::{MouseScrollUnit, MouseWheel},
   },
-  log,
   picking::focus::HoverMap,
   prelude::*,
-  text::cosmic_text::Change,
 };
 use serde_json::json;
 
-const LINE_HEIGHT: f32 = 21.;
+use crate::feedback::{
+  resources::{FeedbackFormState, FeedbackPanelStyles},
+  ui_elements::*,
+};
 
-/* ========= Domene ========= */
+pub mod resources;
+pub mod ui_elements;
+
+pub use resources::FeedbackPanelProps;
+
+const LINE_HEIGHT: f32 = 21.;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, Default)]
 pub enum FeedbackCategory {
@@ -25,6 +31,7 @@ pub enum FeedbackCategory {
   Bugs,
   Other,
 }
+
 impl FeedbackCategory {
   pub const ALL: &'static [FeedbackCategory] = &[
     FeedbackCategory::General,
@@ -34,6 +41,7 @@ impl FeedbackCategory {
     FeedbackCategory::Bugs,
     FeedbackCategory::Other,
   ];
+
   pub fn label(&self) -> &'static str {
     match self {
       FeedbackCategory::General => "General",
@@ -46,54 +54,6 @@ impl FeedbackCategory {
   }
 }
 
-/* ========= State/Ressurser ========= */
-
-#[derive(Resource, Default)]
-pub struct FeedbackPanelVisible(pub bool);
-
-#[derive(Resource, Default)]
-struct FeedbackFormState {
-  rating: u8,                 // 1..=5
-  category: FeedbackCategory, // dropdown-valg
-  include_screenshot: bool,
-  dropdown_open: bool,
-}
-
-/* ========= Markør-komponenter ========= */
-
-#[derive(Component)]
-struct FeedbackPanel;
-#[derive(Component)]
-struct MessageInput; // klikkbar input (Button + Node)
-#[derive(Component)]
-struct MessageTextRoot; // Text (roten) for innhold
-#[derive(Component)]
-struct PlaceholderTextRoot; // Text (roten) for placeholder
-#[derive(Component)]
-struct RatingStar(u8);
-#[derive(Component)]
-struct CategoryButton;
-#[derive(Component)]
-struct CategoryList; // container som toggles
-#[derive(Component)]
-struct CategoryItem(FeedbackCategory);
-#[derive(Component)]
-struct SubmitButton;
-#[derive(Component)]
-struct CancelButton;
-#[derive(Component)]
-struct ScreenshotToggle;
-#[derive(Component)]
-struct ScreenshotToggleText;
-#[derive(Component)]
-struct CategoryButtonText;
-
-#[derive(Component, Default)]
-struct InputState {
-  focused: bool,
-  content: String,
-}
-
 /* ========= Plugin ========= */
 
 pub struct FeedbackUiPlugin;
@@ -101,7 +61,8 @@ impl Plugin for FeedbackUiPlugin {
   fn build(&self, app: &mut App) {
     app
       .init_resource::<FeedbackFormState>()
-      .init_resource::<FeedbackPanelVisible>()
+      .init_resource::<FeedbackPanelProps>()
+      .init_resource::<FeedbackPanelStyles>()
       .add_systems(Startup, spawn_feedback_ui)
       .add_systems(
         Update,
@@ -119,6 +80,7 @@ impl Plugin for FeedbackUiPlugin {
           screenshot_toggle_click_system,
           submit_click_system,
           update_scroll_position,
+          handle_hover_and_click_styles,
         ),
       );
   }
@@ -126,7 +88,7 @@ impl Plugin for FeedbackUiPlugin {
 
 /* ========= UI build ========= */
 
-fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>, styles: Res<FeedbackPanelStyles>) {
   // Root overlay
   commands
     .spawn((
@@ -140,37 +102,48 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
       BackgroundColor(Color::NONE),
       FeedbackPanel,
     ))
+    .observe(
+      |t: Trigger<Pointer<Click>>,
+       mut cmd: Commands,
+       message_input_query: Query<Entity, With<MessageInput>>,
+       styles: Res<FeedbackPanelStyles>| {
+        if message_input_query.get(t.target).is_ok() {
+          return;
+        }
+
+        if let Ok(entity) = message_input_query.get_single() {
+          cmd
+            .entity(entity)
+            .insert(button(styles.surface, styles.border))
+            .remove::<Active>();
+        }
+      },
+    )
     .with_children(|root| {
       // Panel/kort
       root
         .spawn((
           Node {
-            width: Val::Px(520.0),
+            width: Val::Px(420.0),
             min_height: Val::Px(420.0),
-            padding: UiRect::all(Val::Px(16.0)),
-            border: UiRect::all(Val::Px(1.0)),
+            padding: UiRect::axes(Val::Px(48.0), Val::Px(32.0)),
+            border: UiRect::all(Val::Px(2.0)),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(10.0),
             ..default()
           },
-          BackgroundColor(Color::srgb(0.08, 0.08, 0.10)),
-          BorderColor(Color::srgb(0.25, 0.25, 0.30)),
+          panel(styles.background, styles.border),
         ))
-        .with_children(|panel| {
+        .with_children(|child_panel| {
           // Tittel
-          panel.spawn((Text::default(), Node::default())).with_children(|t| {
-            t.spawn((
-              TextSpan::new("Send feedback"),
-              TextFont {
-                font_size: 22.0,
-                ..default()
-              },
-              TextColor(Color::WHITE),
-            ));
-          });
+          child_panel
+            .spawn((Text::default(), Node::default()))
+            .with_children(|t| {
+              t.spawn((TextSpan::new("Send feedback"), TextFont::from_font_size(22.), TextColor(styles.text_primary)));
+            });
 
           // Rad: kategori + rating
-          panel
+          child_panel
             .spawn((
               Node {
                 width: Val::Percent(100.0),
@@ -185,24 +158,23 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
               // Kategori-knapp
               row
                 .spawn((
-                  Button,
                   Node {
+                    width: Val::Percent(100.0),
+                    border: UiRect::all(Val::Px(3.0)),
                     padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
                     ..default()
                   },
-                  BackgroundColor(Color::srgb(0.16, 0.16, 0.20)),
                   CategoryButton,
+                  button(styles.surface, styles.border),
                 ))
                 .with_children(|b| {
+                  b.spawn((Text::new("Category: "), TextFont::from_font_size(16.), TextColor(styles.text_primary)));
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
                     t.spawn((
-                      TextSpan::new("Category: General"),
+                      TextSpan::new(FeedbackCategory::General.label()),
                       CategoryButtonText,
-                      TextFont {
-                        font_size: 16.0,
-                        ..default()
-                      },
-                      TextColor(Color::WHITE),
+                      TextFont::from_font_size(16.),
+                      TextColor(styles.text_primary),
                     ));
                   });
                 });
@@ -251,40 +223,38 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             });
 
           // Dropdown-liste (skjult til å begynne med)
-          panel
+          child_panel
             .spawn((
               Node {
                 width: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
                 row_gap: Val::Px(4.0),
                 padding: UiRect::all(Val::Px(8.0)),
+                border: UiRect::all(Val::Px(1.0)),
                 display: Display::None,
                 ..default()
               },
-              BackgroundColor(Color::srgb(0.10, 0.10, 0.12)),
+              BorderColor(styles.surface),
               CategoryList,
             ))
             .with_children(|list| {
               for cat in FeedbackCategory::ALL {
                 list
                   .spawn((
-                    Button,
                     Node {
+                      border: UiRect::all(Val::Px(1.0)),
                       padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
                       ..default()
                     },
-                    BackgroundColor(Color::srgb(0.14, 0.14, 0.18)),
                     CategoryItem(*cat),
+                    button(styles.surface, styles.border),
                   ))
                   .with_children(|b| {
                     b.spawn((Text::default(), Node::default())).with_children(|t| {
                       t.spawn((
                         TextSpan::new(cat.label()),
-                        TextFont {
-                          font_size: 16.0,
-                          ..default()
-                        },
-                        TextColor(Color::WHITE),
+                        TextFont::from_font_size(14.),
+                        TextColor(styles.text_primary),
                       ));
                     });
                   });
@@ -292,28 +262,24 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             });
 
           // Tekstinput-område
-          panel
-            .spawn((
-              Node {
-                width: Val::Percent(100.0),
-                min_height: Val::Px(180.0),
-                padding: UiRect::all(Val::Px(10.0)),
-                ..default()
-              },
-              BackgroundColor(Color::srgb(0.12, 0.12, 0.16)),
-            ))
+          child_panel
+            .spawn((Node {
+              width: Val::Percent(100.0),
+              min_height: Val::Px(180.0),
+              ..default()
+            },))
             .with_children(|area| {
               area
                 .spawn((
-                  Button, // for å få Interaction (klikk=fokus)
                   Node {
                     width: Val::Percent(100.0),
+                    border: UiRect::all(Val::Px(2.0)),
                     overflow: Overflow::scroll_y(),
+                    padding: UiRect::all(Val::Px(10.0)),
                     ..default()
                   },
-                  BackgroundColor(Color::NONE),
                   MessageInput,
-                  InputState::default(),
+                  button(styles.surface, styles.border),
                 ))
                 .with_children(|field| {
                   // Placeholder
@@ -333,11 +299,8 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     .with_children(|t| {
                       t.spawn((
                         TextSpan::new("Describe your feedback.. (what happened, where, expected vs actual)"),
-                        TextFont {
-                          font_size: 14.0,
-                          ..default()
-                        },
-                        TextColor(Color::srgba(0.6, 0.6, 0.65, 0.7)),
+                        TextFont::from_font_size(14.),
+                        TextColor(styles.text_secondary.with_alpha(0.4)),
                       ));
                     });
                   // Faktisk innhold
@@ -357,19 +320,15 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                       t.spawn((
                         TextSpan::default(),
                         MessageTextRoot,
-                        TextColor(Color::WHITE),
-                        TextFont {
-                          // font: font.clone(),
-                          font_size: 14.0,
-                          ..default()
-                        },
+                        TextColor(styles.text_secondary),
+                        TextFont::from_font_size(14.),
                       ));
                     });
                 });
             });
 
           // Toggle + submit
-          panel
+          child_panel
             .spawn((
               Node {
                 width: Val::Percent(100.0),
@@ -383,30 +342,28 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
               // Screenshot toggle
               row
                 .spawn((
-                  Button,
                   Node {
+                    border: UiRect::all(Val::Px(2.0)),
                     padding: UiRect::axes(Val::Px(8.0), Val::Px(6.0)),
                     ..default()
                   },
-                  BackgroundColor(Color::srgb(0.16, 0.16, 0.20)),
                   ScreenshotToggle,
+                  button(styles.surface, styles.border),
                 ))
                 .with_children(|b| {
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
                     t.spawn((
-                      TextSpan::new("Include screenshot: OFF"),
+                      TextSpan::new("Include screenshot: No"),
                       ScreenshotToggleText,
-                      TextFont {
-                        font_size: 14.0,
-                        ..default()
-                      },
-                      TextColor(Color::WHITE),
+                      TextFont::from_font_size(14.),
+                      TextColor(styles.secondary),
                     ));
                   });
                 });
             });
 
-          panel
+          // Buttons
+          child_panel
             .spawn((
               Node {
                 width: Val::Percent(100.0),
@@ -422,24 +379,17 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
               // Cancel
               row
                 .spawn((
-                  Button,
                   Node {
+                    border: UiRect::all(Val::Px(2.0)),
                     padding: UiRect::axes(Val::Px(14.0), Val::Px(10.0)),
                     ..default()
                   },
-                  BackgroundColor(Color::srgb(0.05, 0.05, 0.05)),
                   CancelButton,
+                  button(styles.surface, styles.border),
                 ))
                 .with_children(|b| {
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
-                    t.spawn((
-                      TextSpan::new("Cancel"),
-                      TextFont {
-                        font_size: 16.0,
-                        ..default()
-                      },
-                      TextColor(Color::WHITE),
-                    ));
+                    t.spawn((TextSpan::new("Cancel"), TextFont::from_font_size(16.), TextColor(styles.text_secondary)));
                   });
                 });
 
@@ -448,22 +398,24 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 .spawn((
                   Button,
                   Node {
+                    border: UiRect::all(Val::Px(2.0)),
                     padding: UiRect::axes(Val::Px(14.0), Val::Px(10.0)),
                     ..default()
                   },
-                  BackgroundColor(Color::srgb(0.05, 0.45, 0.85)),
                   SubmitButton,
+                  ButtonHoverStyle {
+                    background: styles.primary_hover,
+                    border: styles.border.with_alpha(0.5),
+                  },
+                  ButtonPressedStyle {
+                    background: styles.primary_hover.with_alpha(0.5),
+                    border: styles.border.with_alpha(0.2),
+                  },
+                  panel(styles.primary, styles.primary_hover),
                 ))
                 .with_children(|b| {
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
-                    t.spawn((
-                      TextSpan::new("Send"),
-                      TextFont {
-                        font_size: 16.0,
-                        ..default()
-                      },
-                      TextColor(Color::WHITE),
-                    ));
+                    t.spawn((TextSpan::new("Send"), TextFont::from_font_size(16.), TextColor(styles.text_primary)));
                   });
                 });
             });
@@ -474,28 +426,83 @@ fn spawn_feedback_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
 /* ========= Systems ========= */
 
 // F2 for å åpne/lukke panelet
-fn toggle_panel_visibility_with_key(keys: Res<ButtonInput<KeyCode>>, mut visible: ResMut<FeedbackPanelVisible>) {
+fn toggle_panel_visibility_with_key(keys: Res<ButtonInput<KeyCode>>, mut props: ResMut<FeedbackPanelProps>) {
   if keys.just_pressed(KeyCode::F2) {
-    visible.0 = !visible.0;
+    props.visible = !props.visible;
   }
 }
 
 // Synk display med visible
-fn panel_visibility_sync(visible: Res<FeedbackPanelVisible>, mut q: Query<&mut Node, With<FeedbackPanel>>) {
-  if !visible.is_changed() {
+fn panel_visibility_sync(props: Res<FeedbackPanelProps>, mut q: Query<&mut Node, With<FeedbackPanel>>) {
+  if !props.is_changed() {
     return;
   }
   if let Ok(mut node) = q.get_single_mut() {
-    node.display = if visible.0 { Display::Flex } else { Display::None };
+    node.display = if props.visible { Display::Flex } else { Display::None };
   }
+}
+
+// Handle hover and click states
+fn handle_hover_and_click_styles(
+  mut commands: Commands,
+  mut q: Query<
+    (
+      &Interaction,
+      Entity,
+      &mut BackgroundColor,
+      &mut BorderColor,
+      Option<&ButtonHoverStyle>,
+      Option<&ButtonPressedStyle>,
+      Option<&OriginalButtonStyles>,
+      Has<HoldPressed>,
+      Has<Active>,
+    ),
+    (Changed<Interaction>, Or<(With<ButtonHoverStyle>, With<ButtonPressedStyle>)>),
+  >,
+) {
+  q.iter_mut().for_each(
+    |(interaction, entity, mut bg_color, mut border_color, bhs, bps, obs, hold_after_press, is_active)| {
+      match *interaction {
+        Interaction::Hovered => {
+          commands.entity(entity).insert_if_new(OriginalButtonStyles {
+            background: bg_color.0,
+            border: border_color.0,
+          });
+
+          if !is_active && let Some(hover_style) = bhs {
+            bg_color.0 = hover_style.background;
+            border_color.0 = hover_style.border;
+          }
+        },
+        Interaction::Pressed => {
+          if let Some(pressed_style) = bps {
+            bg_color.0 = pressed_style.background;
+            border_color.0 = pressed_style.border;
+          }
+
+          if hold_after_press {
+            commands.entity(entity).insert(Active);
+          }
+        },
+        _ => {
+          if !is_active && let Some(original_styles) = obs {
+            bg_color.0 = original_styles.background;
+            border_color.0 = original_styles.border;
+          }
+        },
+      }
+    },
+  );
 }
 
 // Klikk på input = fokus
 fn input_focus_via_interaction(
-  mut q: Query<(&Interaction, &mut InputState), (Changed<Interaction>, With<MessageInput>)>,
+  styles: Res<FeedbackPanelStyles>,
+  mut q: Query<(&Interaction, &mut InputState, &mut BorderColor), (Changed<Interaction>, With<MessageInput>)>,
 ) {
-  for (interaction, mut state) in &mut q {
+  for (interaction, mut state, mut bd_color) in &mut q {
     if *interaction == Interaction::Pressed {
+      bd_color.0 = styles.accent;
       state.focused = true;
     }
   }
@@ -503,14 +510,20 @@ fn input_focus_via_interaction(
 
 // Klikk på andre knapper = defokus
 fn input_defocus_when_other_buttons_pressed(
-  mut q_input: Query<&mut InputState, With<MessageInput>>,
+  mut commands: Commands,
+  styles: Res<FeedbackPanelStyles>,
+  mut q_input: Query<(Entity, &mut InputState), With<MessageInput>>,
   q_buttons: Query<&Interaction, (With<Button>, Changed<Interaction>, Without<MessageInput>)>,
 ) {
-  let Ok(mut input) = q_input.get_single_mut() else {
+  let Ok((entity, mut input)) = q_input.get_single_mut() else {
     return;
   };
   for interaction in &q_buttons {
     if *interaction == Interaction::Pressed {
+      commands
+        .entity(entity)
+        .insert(button(styles.surface, styles.border))
+        .remove::<Active>();
       input.focused = false;
     }
   }
@@ -661,7 +674,7 @@ fn category_pick_system(
 
       // Oppdater knappetekst
       if let Ok(mut root) = q_btn_text_root.get_single_mut() {
-        **root = format!("Category: {}", cat.label());
+        **root = cat.label().to_string();
       }
     }
   }
@@ -683,18 +696,29 @@ fn dropdown_visibility_sync(form: Res<FeedbackFormState>, mut q: Query<&mut Node
 
 // Screenshot toggle
 fn screenshot_toggle_click_system(
+  styles: Res<FeedbackPanelStyles>,
   mut form: ResMut<FeedbackFormState>,
-  q: Query<&Interaction, (With<ScreenshotToggle>, Changed<Interaction>)>,
-  mut q_text_root: Query<&mut TextSpan, With<ScreenshotToggleText>>,
+  mut q: Query<(&Interaction, &mut BackgroundColor), (With<ScreenshotToggle>, Changed<Interaction>)>,
+  mut q_text_root: Query<(&mut TextSpan, &mut TextColor), With<ScreenshotToggleText>>,
 ) {
-  for interaction in &q {
+  q.iter_mut().for_each(|(interaction, mut bg_color)| {
     if *interaction == Interaction::Pressed {
       form.include_screenshot = !form.include_screenshot;
-      if let Ok(mut root) = q_text_root.get_single_mut() {
-        **root = format!("Include screenshot: {}", if form.include_screenshot { "ON" } else { "OFF" });
+      bg_color.0 = if form.include_screenshot {
+        styles.accent
+      } else {
+        styles.surface
+      };
+      if let Ok((mut root, mut color)) = q_text_root.get_single_mut() {
+        **root = format!("Include screenshot: {}", if form.include_screenshot { "Yes" } else { "No" });
+        color.0 = if form.include_screenshot {
+          styles.text_primary
+        } else {
+          styles.text_secondary
+        };
       }
     }
-  }
+  });
 }
 
 // Submit
@@ -702,7 +726,7 @@ fn submit_click_system(
   q: Query<&Interaction, (With<SubmitButton>, Changed<Interaction>)>,
   q_input: Query<&InputState, With<MessageInput>>,
   form: Res<FeedbackFormState>,
-  mut visible: ResMut<FeedbackPanelVisible>,
+  mut props: ResMut<FeedbackPanelProps>,
 ) {
   for interaction in &q {
     if *interaction != Interaction::Pressed {
@@ -741,7 +765,7 @@ fn submit_click_system(
     //   visible.0 = false;
     // }
 
-    visible.0 = false;
+    props.visible = false;
   }
 }
 
@@ -753,7 +777,7 @@ pub fn update_scroll_position(
   keyboard_input: Res<ButtonInput<KeyCode>>,
 ) {
   for mouse_wheel_event in mouse_wheel_events.read() {
-    let (mut dx, mut dy) = match mouse_wheel_event.unit {
+    let (dx, dy) = match mouse_wheel_event.unit {
       MouseScrollUnit::Line => (mouse_wheel_event.x * LINE_HEIGHT, mouse_wheel_event.y * LINE_HEIGHT),
       MouseScrollUnit::Pixel => (mouse_wheel_event.x, mouse_wheel_event.y),
     };

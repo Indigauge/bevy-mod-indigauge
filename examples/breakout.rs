@@ -4,7 +4,9 @@ use bevy::{
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
 };
-use bevy_mod_indigauge::{IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info};
+use bevy_mod_indigauge::{
+  IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, feedback::FeedbackPanelProps, ig_info,
+};
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -61,6 +63,7 @@ fn main() {
         .add_plugins(IndigaugePlugin::default())
         .insert_resource(Score(0))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
+        .insert_resource(FeedbackPanelProps::visible())
         .add_event::<CollisionEvent>()
         .add_systems(Startup, setup_camera)
         .add_systems(OnEnter(GameState::InitializeSession), init_session)

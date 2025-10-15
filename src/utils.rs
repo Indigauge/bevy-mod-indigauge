@@ -135,12 +135,11 @@ fn extract_generation(name: &str) -> Option<u8> {
     }
   }
   // fallback: try parse from model number (e.g. "i7-11800h" → 11)
-  if let Some(pos) = name.find("i7-") {
-    if name.len() > pos + 3 {
-      if let Some(d) = name[pos + 3..].chars().next() {
-        return d.to_digit(10).map(|v| v as u8);
-      }
-    }
+  if let Some(pos) = name.find("i7-")
+    && name.len() > pos + 3
+    && let Some(d) = name[pos + 3..].chars().next()
+  {
+    return d.to_digit(10).map(|v| v as u8);
   }
   None
 }
@@ -153,10 +152,10 @@ fn extract_ryzen_gen(name: &str) -> Option<String> {
     if *part == "ryzen" && i + 2 < parts.len() {
       let next = parts[i + 2];
       // First digit of model number gives series (5 → 5000)
-      if let Some(first_digit) = next.chars().next() {
-        if first_digit.is_ascii_digit() {
-          return Some(format!("{}000", first_digit));
-        }
+      if let Some(first_digit) = next.chars().next()
+        && first_digit.is_ascii_digit()
+      {
+        return Some(format!("{}000", first_digit));
       }
     }
   }
@@ -235,7 +234,7 @@ pub fn panic_handler(host_origin: String, session_api_key: String) -> impl Fn(&P
       let end_session_endpoint = format!("{}/v1/sessions/end", host_origin);
       let _ = ureq::post(&end_session_endpoint)
         .header("X-Indigauge-Key", &session_api_key)
-        .send_json(&json!({"reason": "crashed"}));
+        .send_json(json!({"reason": "crashed"}));
     }
   }
 }

@@ -11,9 +11,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api_types::BatchEventPayload;
+use crate::resources::IndigaugeConfig;
 use crate::resources::events::BufferedEvents;
 use crate::{IndigaugeLogLevel, LastSentRequestInstant};
-use crate::{SessionApiKey, resources::IndigaugeConfig};
 
 #[derive(SystemParam)]
 pub struct BevyIndigauge<'w, 's> {
@@ -56,7 +56,7 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
         .collect::<Vec<_>>(),
     };
 
-    if let Ok(request) = self.build_request("events/batch", &api_key, &events) {
+    if let Ok(request) = self.build_request("events/batch", api_key, &events) {
       self.last_sent_request.instant = Instant::now();
       self
         .reqwest_client
@@ -71,11 +71,11 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
         });
     }
 
-    return events.events.len();
+    events.events.len()
   }
 
   pub fn send_heartbeat(&mut self, api_key: &str) {
-    if let Ok(request) = self.build_request("sessions/heartbeat", &api_key, &json!({})) {
+    if let Ok(request) = self.build_request("sessions/heartbeat", api_key, &json!({})) {
       self.last_sent_request.instant = Instant::now();
       self
         .reqwest_client

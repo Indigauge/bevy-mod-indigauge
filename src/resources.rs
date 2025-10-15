@@ -5,7 +5,6 @@ use std::{
 };
 
 use bevy::ecs::system::Resource;
-use bevy_mod_reqwest::BevyReqwest;
 
 pub mod events;
 
@@ -58,6 +57,12 @@ impl Deref for SessionApiKey {
 #[derive(Resource)]
 pub struct LastSentRequestInstant {
   pub(crate) instant: Instant,
+}
+
+impl Default for LastSentRequestInstant {
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl LastSentRequestInstant {

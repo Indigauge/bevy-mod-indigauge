@@ -1,26 +1,15 @@
-use std::{
-  env::consts::OS,
-  ops::Deref,
-  time::{Duration, Instant},
-};
+use std::time::Instant;
 
-use bevy::{
-  ecs::system::{IntoObserverSystem, ObserverSystem},
-  prelude::*,
-  time::common_conditions::on_timer,
-  window::WindowCloseRequested,
-};
-use bevy_mod_reqwest::{BevyReqwest, JsonResponse, ReqwestErrorEvent, ReqwestPlugin, ReqwestResponseEvent};
-use crossbeam_channel::{Receiver, Sender, bounded};
+use bevy::{prelude::*, window::WindowCloseRequested};
+use bevy_mod_reqwest::ReqwestPlugin;
+use crossbeam_channel::{Sender, bounded};
 use once_cell::sync::OnceCell;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::{
-  api_types::{ApiResponse, EventPayload, EventPayloadCtx, StartSessionPayload, StartSessionResponse},
-  feedback::{FeedbackPanelVisible, FeedbackUiPlugin},
-  observers::{observe_start_session_event, on_start_session_error, on_start_session_response},
+  events::EventsPlugin,
+  feedback::FeedbackUiPlugin,
+  observers::observe_start_session_event,
   resources::{
     IndigaugeConfig, IndigaugeLogLevel, LastSentRequestInstant, SessionApiKey,
     events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
@@ -29,10 +18,12 @@ use crate::{
 };
 
 mod api_types;
+pub mod events;
 pub mod feedback;
 mod observers;
 pub mod resources;
 pub mod sysparam;
+mod systems;
 pub mod utils;
 
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
@@ -107,52 +98,28 @@ impl Plugin for IndigaugePlugin {
         if self.log_level <= IndigaugeLogLevel::Warn {
           warn!("Indigauge public key is not set");
         }
-      } else {
-        if GLOBAL_TX.get().is_none() {
-          let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
-          GLOBAL_TX.set(tx).ok();
+      } else if GLOBAL_TX.get().is_none() {
+        let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
+        GLOBAL_TX.set(tx).ok();
 
-          app.insert_resource(EventQueueReceiver::new(rx));
-        }
+        app.insert_resource(EventQueueReceiver::new(rx));
       }
     }
 
     app
       .add_plugins(ReqwestPlugin::default())
-      .add_plugins(FeedbackUiPlugin)
-      .insert_resource(FeedbackPanelVisible(true))
+      .add_plugins((FeedbackUiPlugin, EventsPlugin::new(config.flush_interval)))
       .add_event::<StartSessionEvent>()
       .insert_resource(self.log_level.clone())
       .insert_resource(BufferedEvents::default())
       .insert_resource(LastSentRequestInstant::new())
       .add_observer(observe_start_session_event)
-      .add_systems(
-        Update,
-        (
-          handle_queued_events,
-          maybe_flush_events.run_if(resource_changed::<BufferedEvents>),
-          flush_events.run_if(on_timer(config.flush_interval.clone())),
-        )
-          .run_if(resource_exists::<SessionApiKey>),
-      )
       .insert_resource(config)
       .add_systems(
         PostUpdate,
         (handle_exit_event::<AppExit>, handle_exit_event::<WindowCloseRequested>)
           .run_if(resource_exists::<SessionApiKey>),
       );
-  }
-}
-
-fn maybe_flush_events(mut ig: BevyIndigauge, session_key: Res<SessionApiKey>) {
-  if ig.buffered_events.events.len() >= ig.config.batch_size {
-    ig.flush_events(&*session_key);
-  }
-}
-
-fn flush_events(mut ig: BevyIndigauge, session_key: Res<SessionApiKey>) {
-  if ig.flush_events(&*session_key) == 0 {
-    ig.send_heartbeat(&*session_key);
   }
 }
 
@@ -167,27 +134,8 @@ where
       ig.reqwest_client.send(reqwest_client);
     }
 
-    ig.flush_events(&*session_key);
+    ig.flush_events(&session_key);
   });
-}
-
-fn handle_queued_events(
-  receiver: Res<EventQueueReceiver>,
-  mut buffered_events: ResMut<BufferedEvents>,
-  log_level: Res<IndigaugeLogLevel>,
-) {
-  for event in receiver.try_iter() {
-    match event.validate() {
-      Ok(_) => {
-        buffered_events.events.push(event);
-      },
-      Err(err) => {
-        if *log_level <= IndigaugeLogLevel::Error {
-          error!("Invalid event: {}", err);
-        }
-      },
-    }
-  }
 }
 
 /* ===========================

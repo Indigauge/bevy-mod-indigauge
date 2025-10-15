@@ -1,7 +1,4 @@
-use std::env::consts::OS;
-
 use serde::{Deserialize, Serialize};
-use uuid::Error;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
