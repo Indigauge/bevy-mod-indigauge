@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use bevy::ecs::observer::Trigger;
 use bevy::ecs::system::{Res, ResMut, SystemParam};
-use bevy::log::error;
+use bevy::log::{error, info};
 use bevy_mod_reqwest::reqwest::{Error as ReqwestError, Request};
 use bevy_mod_reqwest::{BevyReqwest, ReqwestErrorEvent, ReqwestResponseEvent};
 use serde::Serialize;
@@ -11,8 +11,8 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api_types::BatchEventPayload;
-use crate::resources::IndigaugeConfig;
 use crate::resources::events::BufferedEvents;
+use crate::resources::{IndigaugeConfig, IndigaugeMode};
 use crate::{IndigaugeLogLevel, LastSentRequestInstant};
 
 #[derive(SystemParam)]
@@ -22,6 +22,7 @@ pub struct BevyIndigauge<'w, 's> {
   pub buffered_events: ResMut<'w, BufferedEvents>,
   pub last_sent_request: ResMut<'w, LastSentRequestInstant>,
   pub log_level: Res<'w, IndigaugeLogLevel>,
+  pub mode: Res<'w, IndigaugeMode>,
 }
 
 impl<'w, 's> BevyIndigauge<'w, 's> {
@@ -56,38 +57,58 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
         .collect::<Vec<_>>(),
     };
 
-    if let Ok(request) = self.build_request("events/batch", api_key, &events) {
-      self.last_sent_request.instant = Instant::now();
-      self
-        .reqwest_client
-        .send(request)
-        .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
-          dbg!(trigger.event().body());
-        })
-        .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
-          if *log_level <= IndigaugeLogLevel::Error {
-            error!(message = "Failed to send event batch", error = ?trigger.event().0);
-          }
-        });
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_request("events/batch", api_key, &events) {
+          self.last_sent_request.instant = Instant::now();
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
+              dbg!(trigger.event().body());
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send event batch", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: sending event batch", count = events.events.len());
+        }
+      },
+      _ => {},
     }
 
     events.events.len()
   }
 
   pub fn send_heartbeat(&mut self, api_key: &str) {
-    if let Ok(request) = self.build_request("sessions/heartbeat", api_key, &json!({})) {
-      self.last_sent_request.instant = Instant::now();
-      self
-        .reqwest_client
-        .send(request)
-        .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
-          dbg!("heartbeat response: {:?}", trigger.event().body());
-        })
-        .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
-          if *log_level <= IndigaugeLogLevel::Error {
-            error!(message = "Failed to send session heartbeat", error = ?trigger.event().0);
-          }
-        });
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_request("sessions/heartbeat", api_key, &json!({})) {
+          self.last_sent_request.instant = Instant::now();
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
+              dbg!("heartbeat response: {:?}", trigger.event().body());
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send session heartbeat", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!("DEVMODE: heartbeat");
+        }
+      },
+      _ => {},
     }
   }
 

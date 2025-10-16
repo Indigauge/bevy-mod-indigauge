@@ -6,18 +6,7 @@ use bevy::{
 use bevy_text_edit::TextEditable;
 use serde_json::json;
 
-use crate::{
-  feedback::{
-    FeedbackPanelProps,
-    resources::{FeedbackFormState, FeedbackKeyCodeToggle, FeedbackPanelStyles},
-    ui_elements::{
-      Active, ButtonHoverStyle, ButtonPressedStyle, CancelButton, CategoryButton, CategoryButtonText, CategoryItem,
-      CategoryList, FeedbackCategory, FeedbackPanel, HoldPressed, MessageInput, OriginalButtonStyles, QuestionTextRoot,
-      ScreenshotToggle, ScreenshotToggleText, SubmitButton, button, panel,
-    },
-  },
-  utils::select,
-};
+use crate::{primitives::feedback::*, resources::feedback::*, utils::select};
 
 const LINE_HEIGHT: f32 = 21.;
 

@@ -1,12 +1,13 @@
 use std::{
   env,
-  ops::Deref,
   time::{Duration, Instant},
 };
 
 use bevy::ecs::system::Resource;
 
 pub mod events;
+pub mod feedback;
+pub mod session;
 
 #[derive(Resource, Clone)]
 pub struct IndigaugeConfig {
@@ -36,25 +37,6 @@ impl IndigaugeConfig {
 }
 
 #[derive(Resource)]
-pub struct SessionApiKey {
-  key: String,
-}
-
-impl SessionApiKey {
-  pub(crate) fn new(key: impl Into<String>) -> Self {
-    Self { key: key.into() }
-  }
-}
-
-impl Deref for SessionApiKey {
-  type Target = String;
-
-  fn deref(&self) -> &Self::Target {
-    &self.key
-  }
-}
-
-#[derive(Resource)]
 pub struct LastSentRequestInstant {
   pub(crate) instant: Instant,
 }
@@ -80,4 +62,15 @@ pub enum IndigaugeLogLevel {
   Warn,
   Error,
   Silent,
+}
+
+#[derive(Resource, PartialEq, Default, Clone)]
+pub enum IndigaugeMode {
+  /// Live mode sends data to the Indigauge API.
+  #[default]
+  Live,
+  /// Dev mode only logs data to the console (if logging is enabled).
+  Dev,
+  /// Disabled mode does not send any data to the Indigauge API.
+  Disabled,
 }

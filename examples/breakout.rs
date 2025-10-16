@@ -5,7 +5,8 @@ use bevy::{
   prelude::*,
 };
 use bevy_mod_indigauge::{
-  FeedbackCategory, FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info,
+  FeedbackCategory, FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugeMode, IndigaugePlugin, StartSessionEvent,
+  ig_info,
 };
 
 // These constants are defined in `Transform` units.
@@ -60,7 +61,7 @@ fn main() {
   App::new()
         .add_plugins(DefaultPlugins)
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::default())
+        .add_plugins(IndigaugePlugin::default().mode(IndigaugeMode::Dev))
         .insert_resource(Score(0))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()

@@ -3,11 +3,9 @@ use std::time::Duration;
 use bevy::{prelude::*, time::common_conditions::on_timer};
 
 use crate::{
-  events::system::{flush_events, handle_queued_events, maybe_flush_events},
-  resources::{SessionApiKey, events::BufferedEvents},
+  resources::{events::BufferedEvents, session::SessionApiKey},
+  systems::events::{flush_events, handle_queued_events, maybe_flush_events},
 };
-
-pub mod system;
 
 pub struct EventsPlugin {
   flush_interval: Duration,

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -19,6 +20,14 @@ pub struct StartSessionResponse {
   pub session_token: String,
 }
 
+impl StartSessionResponse {
+  pub fn dev() -> Self {
+    Self {
+      session_token: Uuid::new_v4().to_string(),
+    }
+  }
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct StartSessionPayload<'a> {
@@ -29,6 +38,7 @@ pub struct StartSessionPayload<'a> {
   pub cpu_family: Option<&'a String>,
   pub cores: Option<&'a str>,
   pub memory: Option<&'a str>,
+  pub gpu: Option<&'a String>,
   pub locale: Option<&'a String>,
 }
 

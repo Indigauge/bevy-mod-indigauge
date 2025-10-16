@@ -1,0 +1,89 @@
+use bevy::prelude::*;
+use bevy_mod_reqwest::ReqwestPlugin;
+use crossbeam_channel::bounded;
+
+use crate::{
+  GLOBAL_TX,
+  plugins::{events::EventsPlugin, feedback::FeedbackUiPlugin, session::SessionPlugin},
+  resources::{
+    IndigaugeConfig, IndigaugeLogLevel, IndigaugeMode, LastSentRequestInstant,
+    events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
+  },
+};
+
+pub mod events;
+pub mod feedback;
+pub mod session;
+
+pub struct IndigaugePlugin {
+  public_key: String,
+  /// Defaults to cargo package name
+  game_name: String,
+  game_version: String,
+  log_level: IndigaugeLogLevel,
+  mode: IndigaugeMode,
+}
+
+impl IndigaugePlugin {
+  pub fn new(public_key: String, game_name: Option<String>, game_version: String) -> Self {
+    Self {
+      public_key,
+      game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
+      game_version,
+      ..Default::default()
+    }
+  }
+
+  pub fn log_level(mut self, log_level: IndigaugeLogLevel) -> Self {
+    self.log_level = log_level;
+    self
+  }
+
+  pub fn mode(mut self, mode: IndigaugeMode) -> Self {
+    self.mode = mode;
+    self
+  }
+}
+
+impl Default for IndigaugePlugin {
+  fn default() -> Self {
+    Self {
+      game_name: env!("CARGO_PKG_NAME").to_string(),
+      public_key: std::env::var("INDIGAUGE_PUBLIC_KEY").unwrap_or_else(|_| {
+        warn!("INDIGAUGE_PUBLIC_KEY environment variable not set");
+        "".to_string()
+      }),
+      game_version: env!("CARGO_PKG_VERSION").to_string(),
+      log_level: IndigaugeLogLevel::Info,
+      mode: IndigaugeMode::default(),
+    }
+  }
+}
+
+impl Plugin for IndigaugePlugin {
+  fn build(&self, app: &mut App) {
+    let config = IndigaugeConfig::new(&self.game_name, &self.public_key, &self.game_version);
+
+    if matches!(self.mode, IndigaugeMode::Live | IndigaugeMode::Dev) {
+      if config.public_key.is_empty() {
+        if self.log_level <= IndigaugeLogLevel::Warn {
+          warn!("Indigauge public key is not set");
+        }
+      } else if GLOBAL_TX.get().is_none() {
+        let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
+        GLOBAL_TX.set(tx).ok();
+
+        app.insert_resource(EventQueueReceiver::new(rx));
+      }
+    }
+
+    app
+      .add_plugins(ReqwestPlugin::default())
+      .add_plugins((FeedbackUiPlugin, EventsPlugin::new(config.flush_interval), SessionPlugin))
+      .insert_resource(self.log_level.clone())
+      .insert_resource(BufferedEvents::default())
+      .insert_resource(LastSentRequestInstant::new())
+      .insert_resource(self.mode.clone())
+      .insert_resource(config);
+  }
+}

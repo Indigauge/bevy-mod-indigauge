@@ -1,148 +1,27 @@
 use std::time::Instant;
 
-use bevy::{prelude::*, window::WindowCloseRequested};
-use bevy_mod_reqwest::ReqwestPlugin;
-use crossbeam_channel::{Sender, bounded};
+use crossbeam_channel::Sender;
 use once_cell::sync::OnceCell;
-use serde_json::json;
 
-use crate::{
-  events::EventsPlugin,
-  feedback::FeedbackUiPlugin,
-  observers::observe_start_session_event,
-  resources::{
-    IndigaugeConfig, IndigaugeLogLevel, LastSentRequestInstant, SessionApiKey,
-    events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
-  },
-  sysparam::BevyIndigauge,
-};
+use crate::resources::{LastSentRequestInstant, events::QueuedEvent};
 
 mod api_types;
-pub mod events;
-pub mod feedback;
 mod observers;
+pub mod plugins;
+pub mod primitives;
 pub mod resources;
 pub mod sysparam;
-mod systems;
+pub mod systems;
 pub mod utils;
 
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
 pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
 
-pub use feedback::resources::FeedbackPanelProps;
-pub use feedback::ui_elements::FeedbackCategory;
-
-#[derive(Event, Default)]
-pub struct StartSessionEvent {
-  pub locale: Option<String>,
-  pub platform: Option<String>,
-}
-
-#[derive(Event, Debug)]
-pub enum IndigaugeInitDoneEvent {
-  Success,
-  Skipped(String),
-  Failure(String),
-  UnexpectedFailure(String),
-}
-
-pub struct IndigaugePlugin {
-  public_key: String,
-  /// Defaults to cargo package name
-  game_name: String,
-  game_version: String,
-  enabled: bool,
-  log_level: IndigaugeLogLevel,
-}
-
-impl IndigaugePlugin {
-  pub fn new(public_key: String, game_name: Option<String>, game_version: String) -> Self {
-    Self {
-      public_key,
-      game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
-      game_version,
-      ..Default::default()
-    }
-  }
-
-  pub fn log_level(mut self, log_level: IndigaugeLogLevel) -> Self {
-    self.log_level = log_level;
-    self
-  }
-
-  pub fn enabled(mut self, enabled: bool) -> Self {
-    self.enabled = enabled;
-    self
-  }
-}
-
-impl Default for IndigaugePlugin {
-  fn default() -> Self {
-    Self {
-      game_name: env!("CARGO_PKG_NAME").to_string(),
-      public_key: std::env::var("INDIGAUGE_PUBLIC_KEY").unwrap_or_else(|_| {
-        warn!("INDIGAUGE_PUBLIC_KEY environment variable not set");
-        "".to_string()
-      }),
-      game_version: env!("CARGO_PKG_VERSION").to_string(),
-      enabled: true,
-      log_level: IndigaugeLogLevel::Info,
-    }
-  }
-}
-
-impl Plugin for IndigaugePlugin {
-  fn build(&self, app: &mut App) {
-    let config = IndigaugeConfig::new(&self.game_name, &self.public_key, &self.game_version);
-
-    if self.enabled {
-      if config.public_key.is_empty() {
-        if self.log_level <= IndigaugeLogLevel::Warn {
-          warn!("Indigauge public key is not set");
-        }
-      } else if GLOBAL_TX.get().is_none() {
-        let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
-        GLOBAL_TX.set(tx).ok();
-
-        app.insert_resource(EventQueueReceiver::new(rx));
-      }
-    }
-
-    app
-      .add_plugins(ReqwestPlugin::default())
-      .add_plugins((FeedbackUiPlugin, EventsPlugin::new(config.flush_interval)))
-      .add_event::<StartSessionEvent>()
-      .insert_resource(self.log_level.clone())
-      .insert_resource(BufferedEvents::default())
-      .insert_resource(LastSentRequestInstant::new())
-      .add_observer(observe_start_session_event)
-      .insert_resource(config)
-      .add_systems(
-        PostUpdate,
-        (handle_exit_event::<AppExit>, handle_exit_event::<WindowCloseRequested>)
-          .run_if(resource_exists::<SessionApiKey>),
-      );
-  }
-}
-
-fn handle_exit_event<E>(mut exit_events: EventReader<E>, mut ig: BevyIndigauge, session_key: Res<SessionApiKey>)
-where
-  E: Event + std::fmt::Debug,
-{
-  exit_events.read().for_each(|_event| {
-    let reqwest_client = ig.build_request("sessions/end", &session_key, &json!({"reason": "ended"}));
-
-    if let Ok(reqwest_client) = reqwest_client {
-      ig.reqwest_client.send(reqwest_client);
-    }
-
-    ig.flush_events(&session_key);
-  });
-}
-
-/* ===========================
-Makroer – tracing-lignende
-=========================== */
+pub use plugins::IndigaugePlugin;
+pub use primitives::feedback::FeedbackCategory;
+pub use primitives::{IndigaugeInitDoneEvent, session::StartSessionEvent};
+pub use resources::feedback::{FeedbackKeyCodeToggle, FeedbackPanelProps};
+pub use resources::{IndigaugeLogLevel, IndigaugeMode};
 
 pub mod macros {
   #[macro_export]

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::feedback::FeedbackCategory;
+use crate::primitives::feedback::FeedbackCategory;
 
 #[derive(Resource, Debug)]
 pub struct FeedbackKeyCodeToggle(pub KeyCode);

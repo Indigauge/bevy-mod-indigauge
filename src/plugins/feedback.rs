@@ -2,21 +2,10 @@
 use bevy::prelude::*;
 use bevy_text_edit::TextEditPluginNoState;
 
-use crate::feedback::{
-  resources::{FeedbackFormState, FeedbackKeyCodeToggle, FeedbackPanelStyles},
-  systems::{
-    category_pick_system, category_toggle_system, dropdown_visibility_sync, handle_hover_and_click_styles,
-    panel_visibility_sync, screenshot_toggle_click_system, spawn_feedback_ui, submit_click_system,
-    toggle_panel_visibility_with_key, update_scroll_position,
-  },
-  ui_elements::*,
+use crate::{
+  resources::{feedback::*, session::SessionApiKey},
+  systems::feedback::*,
 };
-
-pub mod resources;
-mod systems;
-pub mod ui_elements;
-
-pub use resources::FeedbackPanelProps;
 
 pub struct FeedbackUiPlugin;
 impl Plugin for FeedbackUiPlugin {
@@ -39,7 +28,8 @@ impl Plugin for FeedbackUiPlugin {
           submit_click_system,
           update_scroll_position,
           handle_hover_and_click_styles,
-        ),
+        )
+          .run_if(resource_exists::<SessionApiKey>),
       );
   }
 }
