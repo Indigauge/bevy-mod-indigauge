@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
@@ -23,7 +22,7 @@ pub struct StartSessionResponse {
 impl StartSessionResponse {
   pub fn dev() -> Self {
     Self {
-      session_token: Uuid::new_v4().to_string(),
+      session_token: "dev".to_string(),
     }
   }
 }
@@ -68,4 +67,14 @@ pub struct EventPayloadCtx {
   pub file: String,
   pub line: u32,
   pub module: Option<&'static str>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct FeedbackPayload<'a> {
+  pub message: &'a str,
+  /// Defaults to elapsed time since session start
+  pub elapsed_ms: u128,
+  pub question: Option<&'a String>,
+  pub category: String,
 }

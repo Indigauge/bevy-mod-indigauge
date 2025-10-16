@@ -88,4 +88,5 @@ pub struct FeedbackFormState {
   pub include_screenshot: bool,
   pub dropdown_open: bool,
   pub question: Option<String>,
+  pub error: Option<String>,
 }

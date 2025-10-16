@@ -19,6 +19,7 @@ impl Plugin for FeedbackUiPlugin {
         Update,
         (
           spawn_feedback_ui.run_if(resource_exists_and_changed::<FeedbackPanelProps>),
+          despawn_feedback_panel.run_if(resource_removed::<FeedbackPanelProps>),
           toggle_panel_visibility_with_key.run_if(resource_exists::<FeedbackKeyCodeToggle>),
           panel_visibility_sync.run_if(resource_exists_and_changed::<FeedbackPanelProps>),
           category_toggle_system,

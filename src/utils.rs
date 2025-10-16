@@ -209,6 +209,11 @@ pub const fn validate_event_type(s: &str) -> &str {
 pub fn panic_handler(host_origin: String, session_api_key: String) -> impl Fn(&PanicHookInfo) + Send + Sync + 'static {
   move |info| {
     if let Some(start_instant) = SESSION_START_INSTANT.get() {
+      use crate::api_types::StartSessionResponse;
+      if session_api_key == StartSessionResponse::dev().session_token {
+        return;
+      }
+
       let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
 
       let metadata = info

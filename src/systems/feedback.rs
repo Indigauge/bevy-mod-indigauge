@@ -1,66 +1,94 @@
+use std::time::Instant;
+
 use bevy::{
   input::mouse::{MouseScrollUnit, MouseWheel},
   picking::focus::HoverMap,
   prelude::*,
 };
 use bevy_text_edit::TextEditable;
-use serde_json::json;
 
-use crate::{primitives::feedback::*, resources::feedback::*, utils::select};
+use crate::{
+  SESSION_START_INSTANT,
+  api_types::FeedbackPayload,
+  primitives::feedback::*,
+  resources::{feedback::*, session::SessionApiKey},
+  sysparam::BevyIndigauge,
+  utils::select,
+};
 
 const LINE_HEIGHT: f32 = 21.;
 
+pub fn despawn_feedback_panel(mut commands: Commands, query: Query<Entity, With<FeedbackPanel>>) {
+  for entity in &query {
+    commands.entity(entity).despawn_recursive();
+  }
+}
+
 // Submit
 pub fn submit_click_system(
+  mut commands: Commands,
   q: Query<&Interaction, (With<SubmitButton>, Changed<Interaction>)>,
   q_input: Query<&Text, With<MessageInput>>,
-  form: Res<FeedbackFormState>,
-  mut props: ResMut<FeedbackPanelProps>,
+  mut form: ResMut<FeedbackFormState>,
+  mut ig: BevyIndigauge,
+  session_key: Res<SessionApiKey>,
 ) {
   for interaction in &q {
     if *interaction != Interaction::Pressed {
       continue;
     }
 
-    let msg = q_input.get_single().map(|s| s.to_string()).unwrap_or_default();
-    if msg.is_empty() {
-      // TODO: vis toast
-      return;
+    if let Some(start_instant) = SESSION_START_INSTANT.get() {
+      let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
+
+      let msg = q_input
+        .get_single()
+        .map(|s| s.to_string())
+        .unwrap_or_default()
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .replace("  ", " ")
+        .trim()
+        .to_string();
+
+      if msg.len().lt(&2) {
+        form.error = Some("Feedback cannot be less than 2 characters".to_string());
+        return;
+      }
+
+      let screenshot_url: Option<String> = if form.include_screenshot {
+        // TODO: koble til faktisk screenshot-pipeline (returner URL eller legg ved opplasting)
+        None
+      } else {
+        None
+      };
+
+      let payload = FeedbackPayload {
+        message: &msg,
+        category: form.category.label().to_lowercase(),
+        elapsed_ms,
+        question: form.question.as_ref(),
+      };
+
+      ig.send_feedback(&session_key, &payload);
+
+      commands.remove_resource::<FeedbackPanelProps>();
     }
-
-    let screenshot_url: Option<String> = if form.include_screenshot {
-      // TODO: koble til faktisk screenshot-pipeline (returner URL eller legg ved opplasting)
-      None
-    } else {
-      None
-    };
-
-    let payload = json!({
-        "message": msg,
-        "category": form.category.label(),
-        "screenshot_url": screenshot_url,
-    });
-
-    dbg!(&payload);
-    // let ok = indigauge_client::send_feedback(payload);
-    // if !ok {
-    //   // TODO: toast "failed to enqueue"
-    // } else {
-    //   // valgfritt: lukk panelet eller tøm innhold
-    //   visible.0 = false;
-    // }
-
-    props.visible = false;
   }
 }
 
 pub fn toggle_panel_visibility_with_key(
+  mut commands: Commands,
   keys: Res<ButtonInput<KeyCode>>,
   toggle_button: Res<FeedbackKeyCodeToggle>,
-  mut props: ResMut<FeedbackPanelProps>,
+  props: Option<ResMut<FeedbackPanelProps>>,
 ) {
   if keys.just_pressed(toggle_button.0) {
-    props.visible = !props.visible;
+    if let Some(mut props) = props {
+      props.visible = !props.visible;
+    } else {
+      commands.insert_resource(FeedbackPanelProps::visible());
+    }
   }
 }
 
@@ -400,6 +428,7 @@ pub fn spawn_feedback_ui(
                     TextColor(styles.text_primary),
                     MessageInput,
                     TextEditable {
+                      filter_in: vec!["[a-zA-Z0-9 .,;:!?()\"'-]".into(), " ".into()],
                       placeholder: "Provide feedback message here".to_string(),
                       ..Default::default()
                     },

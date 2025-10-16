@@ -10,7 +10,7 @@ use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::api_types::BatchEventPayload;
+use crate::api_types::{BatchEventPayload, FeedbackPayload};
 use crate::resources::events::BufferedEvents;
 use crate::resources::{IndigaugeConfig, IndigaugeMode};
 use crate::{IndigaugeLogLevel, LastSentRequestInstant};
@@ -40,6 +40,33 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
       .header("X-Indigauge-Key", ig_key)
       .json(payload)
       .build()
+  }
+
+  pub fn send_feedback(&mut self, api_key: &str, payload: &FeedbackPayload) {
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_request("feedback", api_key, payload) {
+          self.last_sent_request.instant = Instant::now();
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
+              dbg!(trigger.event().body());
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send feedback", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: Sent feedback", feedback = ?payload);
+        }
+      },
+      _ => {},
+    }
   }
 
   pub fn flush_events(&mut self, api_key: &str) -> usize {
