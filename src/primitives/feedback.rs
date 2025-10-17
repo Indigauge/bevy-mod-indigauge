@@ -69,8 +69,6 @@ pub struct ButtonPressedStyle {
   pub border: Color,
 }
 
-pub struct FeedbackPanelCard;
-
 #[derive(Component)]
 pub struct FeedbackPanel;
 
@@ -78,16 +76,10 @@ pub struct FeedbackPanel;
 pub struct MessageInput;
 
 #[derive(Component)]
-pub struct MessageTextRoot;
-
-#[derive(Component)]
 pub struct QuestionTextRoot;
 
-#[derive(Component)]
-pub struct PlaceholderTextRoot;
-
-#[derive(Component)]
-pub struct RatingStar(pub u8);
+// #[derive(Component)]
+// pub struct RatingStar(pub u8);
 
 #[derive(Component)]
 pub struct CategoryButton;
@@ -119,13 +111,6 @@ pub struct HoldPressed;
 
 #[derive(Component)]
 pub struct Active;
-
-#[derive(Component, Default)]
-pub struct InputState {
-  pub focused: bool,
-  pub content: String,
-  pub cursor_position: usize,
-}
 
 pub fn panel(background_color: Color, border_color: Color) -> impl Bundle {
   (BorderRadius::all(Val::Px(8.0)), BackgroundColor(background_color), BorderColor(border_color))

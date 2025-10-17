@@ -7,11 +7,11 @@ use crate::resources::{LastSentRequestInstant, events::QueuedEvent};
 
 mod api_types;
 mod observers;
-pub mod plugins;
-pub mod primitives;
-pub mod resources;
-pub mod sysparam;
-pub mod systems;
+pub(crate) mod plugins;
+pub(crate) mod primitives;
+pub(crate) mod resources;
+pub(crate) mod sysparam;
+pub(crate) mod systems;
 pub mod utils;
 
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
@@ -20,7 +20,7 @@ pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
 pub use plugins::IndigaugePlugin;
 pub use primitives::feedback::FeedbackCategory;
 pub use primitives::{IndigaugeInitDoneEvent, session::StartSessionEvent};
-pub use resources::feedback::{FeedbackKeyCodeToggle, FeedbackPanelProps};
+pub use resources::feedback::{FeedbackKeyCodeToggle, FeedbackPanelProps, FeedbackPanelStyles};
 pub use resources::{IndigaugeLogLevel, IndigaugeMode};
 
 pub mod macros {

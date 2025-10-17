@@ -11,9 +11,9 @@ use crate::{
   },
 };
 
-pub mod events;
-pub mod feedback;
-pub mod session;
+mod events;
+mod feedback;
+mod session;
 
 pub struct IndigaugePlugin {
   public_key: String,
@@ -25,11 +25,11 @@ pub struct IndigaugePlugin {
 }
 
 impl IndigaugePlugin {
-  pub fn new(public_key: String, game_name: Option<String>, game_version: String) -> Self {
+  pub fn new(public_key: impl Into<String>, game_name: Option<String>, game_version: Option<String>) -> Self {
     Self {
-      public_key,
+      public_key: public_key.into(),
       game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
-      game_version,
+      game_version: game_version.unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
       ..Default::default()
     }
   }

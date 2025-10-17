@@ -83,7 +83,7 @@ impl FeedbackPanelProps {
 
 #[derive(Resource, Default)]
 pub struct FeedbackFormState {
-  pub rating: u8,                 // 1..=5
+  // pub rating: u8,                 // 1..=5
   pub category: FeedbackCategory, // dropdown-valg
   pub include_screenshot: bool,
   pub dropdown_open: bool,
