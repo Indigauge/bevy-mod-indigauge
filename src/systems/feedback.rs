@@ -1,15 +1,18 @@
-use std::time::Instant;
+use std::{ops::Deref, time::Instant};
 
 use bevy::{
   input::mouse::{MouseScrollUnit, MouseWheel},
   picking::focus::HoverMap,
   prelude::*,
+  render::view::screenshot::{Screenshot, ScreenshotCaptured},
 };
+use bevy_mod_reqwest::ReqwestResponseEvent;
 use bevy_text_edit::TextEditable;
+use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
 use crate::{
-  SESSION_START_INSTANT,
-  api_types::FeedbackPayload,
+  IndigaugeLogLevel, SESSION_START_INSTANT,
+  api_types::{FeedbackPayload, IdResponse},
   primitives::feedback::*,
   resources::{feedback::*, session::SessionApiKey},
   sysparam::BevyIndigauge,
@@ -21,6 +24,45 @@ const LINE_HEIGHT: f32 = 21.;
 pub fn despawn_feedback_panel(mut commands: Commands, query: Query<Entity, With<FeedbackPanel>>) {
   for entity in &query {
     commands.entity(entity).despawn_recursive();
+  }
+}
+
+fn maybe_take_screenshot(
+  trigger: Trigger<ReqwestResponseEvent>,
+  mut commands: Commands,
+  take_screenshot: Option<Res<TakeScreenshot>>,
+) {
+  if take_screenshot.is_some()
+    && let Ok(feedback_id) = trigger.event().deserialize_json::<IdResponse>()
+  {
+    commands.remove_resource::<TakeScreenshot>();
+    commands.spawn(Screenshot::primary_window()).observe(
+      move |trigger: Trigger<ScreenshotCaptured>, mut ig: BevyIndigauge, api_key: Res<SessionApiKey>| {
+        let img = trigger.event().deref().clone();
+
+        match img.try_into_dynamic() {
+          Ok(dyn_img) => {
+            let data = dyn_img.to_rgb8().to_vec();
+            let mut png = Vec::new();
+            let enc = PngEncoder::new(&mut png);
+
+            if enc
+              .write_image(&data, dyn_img.width(), dyn_img.height(), ColorType::Rgb8)
+              .is_ok()
+            {
+              ig.send_feedback_screenshot(&api_key, &feedback_id, png);
+            } else if *ig.log_level <= IndigaugeLogLevel::Error {
+              error!(message = "Failed to encode screenshot as PNG");
+            }
+          },
+          Err(error) => {
+            if *ig.log_level <= IndigaugeLogLevel::Error {
+              error!(message = "Failed to convert screenshot into dynamic image", ?error);
+            }
+          },
+        }
+      },
+    );
   }
 }
 
@@ -56,12 +98,9 @@ pub fn submit_click_system(
         return;
       }
 
-      let screenshot_url: Option<String> = if form.include_screenshot {
-        // TODO: koble til faktisk screenshot-pipeline (returner URL eller legg ved opplasting)
-        None
-      } else {
-        None
-      };
+      if form.include_screenshot {
+        commands.insert_resource(TakeScreenshot);
+      }
 
       let payload = FeedbackPayload {
         message: &msg,
@@ -70,7 +109,7 @@ pub fn submit_click_system(
         question: form.question.as_ref(),
       };
 
-      ig.send_feedback(&session_key, &payload);
+      ig.send_feedback(&session_key, &payload, maybe_take_screenshot);
 
       commands.remove_resource::<FeedbackPanelProps>();
     }

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -11,6 +13,19 @@ pub enum ApiResponse<T, E = ErrorBody> {
 pub struct ErrorBody {
   pub code: String,
   pub message: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IdResponse {
+  pub id: String,
+}
+
+impl Deref for IdResponse {
+  type Target = String;
+
+  fn deref(&self) -> &Self::Target {
+    &self.id
+  }
 }
 
 #[derive(Debug, Deserialize)]

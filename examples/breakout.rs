@@ -61,7 +61,7 @@ fn main() {
   App::new()
         .add_plugins(DefaultPlugins)
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::default().mode(IndigaugeMode::Dev))
+        .add_plugins(IndigaugePlugin::default())
         .insert_resource(Score(0))
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()

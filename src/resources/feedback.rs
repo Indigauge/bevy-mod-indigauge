@@ -90,3 +90,6 @@ pub struct FeedbackFormState {
   pub question: Option<String>,
   pub error: Option<String>,
 }
+
+#[derive(Resource)]
+pub struct TakeScreenshot;
