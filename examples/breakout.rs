@@ -4,10 +4,7 @@ use bevy::{
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
 };
-use bevy_mod_indigauge::{
-  FeedbackCategory, FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugeMode, IndigaugePlugin, StartSessionEvent,
-  ig_info,
-};
+use bevy_mod_indigauge::{FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info};
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.

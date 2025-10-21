@@ -70,10 +70,10 @@ fn trigger_feedback_with_question(
   }
 
   if keys.just_pressed(KeyCode::Space) {
-    commands.insert_resource(
-      FeedbackPanelProps::with_question("What did you think about level 3?", FeedbackCategory::Gameplay)
-        .allow_screenshot(false),
-    );
+    commands.insert_resource(FeedbackPanelProps::with_question(
+      "What did you think about level 3?",
+      FeedbackCategory::Gameplay,
+    ));
   }
 }
 

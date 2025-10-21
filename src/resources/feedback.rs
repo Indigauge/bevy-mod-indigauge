@@ -48,16 +48,80 @@ impl Default for FeedbackPanelStyles {
   }
 }
 
+/// A [`Resource`] that controls the visibility and behavior of the in-game
+/// feedback panel.
+///
+/// This resource is inserted into the [`World`](bevy::prelude::World) when you
+/// want to show the feedback form manually. The [`FeedbackPanelPlugin`] listens
+/// for it and renders a user interface that allows players to submit feedback
+/// directly from within the game.
+///
+/// The feedback panel can optionally display a custom title and question, and
+/// categorize the submitted feedback (for example, “Gameplay”, “UI”, or
+/// “Performance”).
+///
+/// # Usage
+///
+/// You can insert this resource into the world at any time to display a feedback
+/// form. For example:
+///
+/// ```rust
+/// use bevy::prelude::*;
+/// use indigauge_client::{FeedbackPanelProps, FeedbackCategory};
+///
+/// fn trigger_feedback_with_question(
+///     mut commands: Commands,
+///     keys: Res<ButtonInput<KeyCode>>,
+/// ) {
+///     if keys.just_pressed(KeyCode::Space) {
+///         // Manually trigger the feedback panel with a predefined question.
+///         commands.insert_resource(
+///             FeedbackPanelProps::with_question(
+///                 "What did you think about level 3?",
+///                 FeedbackCategory::Gameplay,
+///             ),
+///         );
+///     }
+/// }
+/// ```
+///
+/// # Fields
+///
+/// * `title` – Optional custom title shown at the top of the feedback form.
+/// * `question` – Optional question to ask the player. Useful when you want
+///   feedback about a specific moment or feature.
+/// * `category` – Optional [`FeedbackCategory`] to tag the feedback (e.g.,
+///   `Gameplay`, `UI`, `Bug`, etc.). If not provided, a category dropdown will be shown.
+/// * `visible` – Whether the feedback panel is currently visible.
+///   Managed automatically by the plugin.
+/// * `allow_screenshot` – Whether the player should be allowed to attach
+///   a screenshot with their feedback submission.
+///
+/// # See Also
+///
+/// * [`FeedbackCategory`] – Defines available categories for feedback.
+///
 #[derive(Resource, Default)]
 pub struct FeedbackPanelProps {
+  /// Optional custom title shown at the top of the feedback form.
   pub(crate) title: Option<String>,
+
+  /// Optional question to ask the player.
   pub(crate) question: Option<String>,
+
+  /// The category to tag the feedback with (e.g., Gameplay, UI, Bug).
   pub(crate) category: Option<FeedbackCategory>,
+
+  /// Whether the feedback panel is currently visible.
   pub(crate) visible: bool,
+
+  /// Whether screenshots are allowed when submitting feedback.
   pub(crate) allow_screenshot: bool,
 }
 
 impl FeedbackPanelProps {
+  /// Creates a new feedback panel with a question and a fixed category.
+  /// Screenshots are not allowed by default.
   pub fn with_question(question: impl Into<String>, category: FeedbackCategory) -> Self {
     Self {
       title: None,
