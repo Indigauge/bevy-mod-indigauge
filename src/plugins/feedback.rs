@@ -22,11 +22,7 @@ impl Plugin for FeedbackUiPlugin {
           despawn_feedback_panel.run_if(resource_removed::<FeedbackPanelProps>),
           toggle_panel_visibility_with_key.run_if(resource_exists::<FeedbackKeyCodeToggle>),
           panel_visibility_sync.run_if(resource_exists_and_changed::<FeedbackPanelProps>),
-          category_toggle_system,
-          category_pick_system,
           dropdown_visibility_sync.run_if(resource_exists_and_changed::<FeedbackFormState>),
-          screenshot_toggle_click_system,
-          submit_click_system,
           update_scroll_position,
           handle_hover_and_click_styles,
         )

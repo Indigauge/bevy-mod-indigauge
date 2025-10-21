@@ -50,6 +50,7 @@ impl Default for FeedbackPanelStyles {
 
 #[derive(Resource, Default)]
 pub struct FeedbackPanelProps {
+  pub(crate) title: Option<String>,
   pub(crate) question: Option<String>,
   pub(crate) category: Option<FeedbackCategory>,
   pub(crate) visible: bool,
@@ -59,20 +60,29 @@ pub struct FeedbackPanelProps {
 impl FeedbackPanelProps {
   pub fn with_question(question: impl Into<String>, category: FeedbackCategory) -> Self {
     Self {
+      title: None,
       question: Some(question.into()),
       category: Some(category),
       visible: true,
-      allow_screenshot: true,
+      allow_screenshot: false,
     }
   }
 
+  /// Creates a new feedback panel with "Send feedback" as title, no question and no category.
+  /// Screenshots are allowed by default.
   pub fn visible() -> Self {
     Self {
+      title: Some("Send feedback".to_string()),
       question: None,
       category: None,
       visible: true,
       allow_screenshot: true,
     }
+  }
+
+  pub fn title(mut self, title: impl Into<String>) -> Self {
+    self.title = Some(title.into());
+    self
   }
 
   pub fn allow_screenshot(mut self, allow_screenshot: bool) -> Self {

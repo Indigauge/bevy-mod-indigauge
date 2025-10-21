@@ -1,21 +1,17 @@
-use std::{ops::Deref, time::Instant};
-
 use bevy::{
   input::mouse::{MouseScrollUnit, MouseWheel},
   picking::focus::HoverMap,
   prelude::*,
-  render::view::screenshot::{Screenshot, ScreenshotCaptured},
 };
-use bevy_mod_reqwest::ReqwestResponseEvent;
 use bevy_text_edit::TextEditable;
-use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
 use crate::{
-  IndigaugeLogLevel, SESSION_START_INSTANT,
-  api_types::{FeedbackPayload, IdResponse},
+  observers::feedback::{
+    observe_cancel_click, observe_category_dropdown_click, observe_category_item_click,
+    observe_screenshot_toggle_click, observe_submit_click,
+  },
   primitives::feedback::*,
-  resources::{feedback::*, session::SessionApiKey},
-  sysparam::BevyIndigauge,
+  resources::feedback::*,
   utils::select,
 };
 
@@ -24,95 +20,6 @@ const LINE_HEIGHT: f32 = 21.;
 pub fn despawn_feedback_panel(mut commands: Commands, query: Query<Entity, With<FeedbackPanel>>) {
   for entity in &query {
     commands.entity(entity).despawn_recursive();
-  }
-}
-
-fn maybe_take_screenshot(
-  trigger: Trigger<ReqwestResponseEvent>,
-  mut commands: Commands,
-  take_screenshot: Option<Res<TakeScreenshot>>,
-) {
-  if take_screenshot.is_some()
-    && let Ok(feedback_id) = trigger.event().deserialize_json::<IdResponse>()
-  {
-    commands.remove_resource::<TakeScreenshot>();
-    commands.spawn(Screenshot::primary_window()).observe(
-      move |trigger: Trigger<ScreenshotCaptured>, mut ig: BevyIndigauge, api_key: Res<SessionApiKey>| {
-        let img = trigger.event().deref().clone();
-
-        match img.try_into_dynamic() {
-          Ok(dyn_img) => {
-            let data = dyn_img.to_rgb8().to_vec();
-            let mut png = Vec::new();
-            let enc = PngEncoder::new(&mut png);
-
-            if enc
-              .write_image(&data, dyn_img.width(), dyn_img.height(), ColorType::Rgb8)
-              .is_ok()
-            {
-              ig.send_feedback_screenshot(&api_key, &feedback_id, png);
-            } else if *ig.log_level <= IndigaugeLogLevel::Error {
-              error!(message = "Failed to encode screenshot as PNG");
-            }
-          },
-          Err(error) => {
-            if *ig.log_level <= IndigaugeLogLevel::Error {
-              error!(message = "Failed to convert screenshot into dynamic image", ?error);
-            }
-          },
-        }
-      },
-    );
-  }
-}
-
-// Submit
-pub fn submit_click_system(
-  mut commands: Commands,
-  q: Query<&Interaction, (With<SubmitButton>, Changed<Interaction>)>,
-  q_input: Query<&Text, With<MessageInput>>,
-  mut form: ResMut<FeedbackFormState>,
-  mut ig: BevyIndigauge,
-  session_key: Res<SessionApiKey>,
-) {
-  for interaction in &q {
-    if *interaction != Interaction::Pressed {
-      continue;
-    }
-
-    if let Some(start_instant) = SESSION_START_INSTANT.get() {
-      let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
-
-      let msg = q_input
-        .get_single()
-        .map(|s| s.to_string())
-        .unwrap_or_default()
-        .replace("\r\n", "\n")
-        .replace('\r', "\n")
-        .replace("  ", " ")
-        .trim()
-        .to_string();
-
-      if msg.len().lt(&2) {
-        form.error = Some("Feedback cannot be less than 2 characters".to_string());
-        return;
-      }
-
-      if form.include_screenshot {
-        commands.insert_resource(TakeScreenshot);
-      }
-
-      let payload = FeedbackPayload {
-        message: &msg,
-        category: form.category.label().to_lowercase(),
-        elapsed_ms,
-        question: form.question.as_ref(),
-      };
-
-      ig.send_feedback(&session_key, &payload, maybe_take_screenshot);
-
-      commands.remove_resource::<FeedbackPanelProps>();
-    }
   }
 }
 
@@ -192,68 +99,11 @@ pub fn handle_hover_and_click_styles(mut commands: Commands, mut q: HoverAndClic
   );
 }
 
-// Toggle dropdown
-pub fn category_toggle_system(
-  mut form: ResMut<FeedbackFormState>,
-  q: Query<&Interaction, (With<CategoryButton>, Changed<Interaction>)>,
-) {
-  for interaction in &q {
-    if *interaction == Interaction::Pressed {
-      form.dropdown_open = !form.dropdown_open;
-    }
-  }
-}
-
-type CategoryItemInteractionQuery<'a, 'w, 's> =
-  Query<'w, 's, (&'a Interaction, &'a CategoryItem), (With<Button>, Changed<Interaction>)>;
-// Plukke kategori + oppdatere knapptittel
-pub fn category_pick_system(
-  mut form: ResMut<FeedbackFormState>,
-  q_items: CategoryItemInteractionQuery,
-  mut q_btn_text_root: Query<&mut TextSpan, With<CategoryButtonText>>,
-) {
-  for (interaction, CategoryItem(cat)) in &q_items {
-    if *interaction == Interaction::Pressed {
-      form.category = *cat;
-      form.dropdown_open = false;
-
-      // Oppdater knappetekst
-      if let Ok(mut root) = q_btn_text_root.get_single_mut() {
-        **root = cat.label().to_string();
-      }
-    }
-  }
-}
-
 // Synk dropdown synlighet
 pub fn dropdown_visibility_sync(form: Res<FeedbackFormState>, mut q: Query<&mut Node, With<CategoryList>>) {
-  if !form.is_changed() {
-    return;
-  }
   if let Ok(mut n) = q.get_single_mut() {
     n.display = select(Display::Flex, Display::None, form.dropdown_open);
   }
-}
-
-type ScreenshotToggleInteractionQuery<'a, 'w, 's> =
-  Query<'w, 's, (&'a Interaction, &'a mut BackgroundColor), (With<ScreenshotToggle>, Changed<Interaction>)>;
-// Screenshot toggle
-pub fn screenshot_toggle_click_system(
-  styles: Res<FeedbackPanelStyles>,
-  mut form: ResMut<FeedbackFormState>,
-  mut q: ScreenshotToggleInteractionQuery,
-  mut q_text_root: Query<(&mut TextSpan, &mut TextColor), With<ScreenshotToggleText>>,
-) {
-  q.iter_mut().for_each(|(interaction, mut bg_color)| {
-    if *interaction == Interaction::Pressed {
-      form.include_screenshot = !form.include_screenshot;
-      bg_color.0 = select(styles.accent, styles.surface, form.include_screenshot);
-      if let Ok((mut root, mut color)) = q_text_root.get_single_mut() {
-        **root = format!("Include screenshot: {}", select("Yes", "No", form.include_screenshot));
-        color.0 = select(styles.text_primary, styles.text_secondary, form.include_screenshot);
-      }
-    }
-  });
 }
 
 /// Updates the scroll position of scrollable nodes in response to mouse input
@@ -329,22 +179,22 @@ pub fn spawn_feedback_ui(
         ))
         .with_children(|child_panel| {
           // Title
-          child_panel
-            .spawn((Text::default(), Node::default()))
-            .with_children(|t| {
-              t.spawn((TextSpan::new("Send feedback"), TextFont::from_font_size(22.), TextColor(styles.text_primary)));
-            });
-
-          if let Some(question) = &props.question {
+          if let Some(title) = &props.title {
             child_panel
               .spawn((Text::default(), Node::default()))
               .with_children(|t| {
-                t.spawn((
-                  Text::new(question),
-                  QuestionTextRoot,
-                  TextFont::from_font_size(18.),
-                  TextColor(styles.text_secondary),
-                ));
+                t.spawn((TextSpan::new(title), TextFont::from_font_size(22.), TextColor(styles.text_primary)));
+              });
+          }
+
+          if let Some(question) = &props.question {
+            let size = select(22., 18., props.title.is_some());
+            let color = select(styles.text_primary, styles.text_secondary, props.title.is_some());
+
+            child_panel
+              .spawn((Text::default(), Node::default()))
+              .with_children(|t| {
+                t.spawn((Text::new(question), QuestionTextRoot, TextFont::from_font_size(size), TextColor(color)));
               });
           } else {
             // Category
@@ -382,7 +232,8 @@ pub fn spawn_feedback_ui(
                         TextColor(styles.text_primary),
                       ));
                     });
-                  });
+                  })
+                  .observe(observe_category_dropdown_click);
               });
 
             // Dropdown-list (hidden as default)
@@ -430,7 +281,8 @@ pub fn spawn_feedback_ui(
                           TextColor(styles.text_primary),
                         ));
                       });
-                    });
+                    })
+                    .observe(observe_category_item_click);
                 }
               });
           }
@@ -467,6 +319,7 @@ pub fn spawn_feedback_ui(
                     TextColor(styles.text_primary),
                     MessageInput,
                     TextEditable {
+                      max_length: 1000,
                       filter_in: vec!["[a-zA-Z0-9 .,;:!?()\"'-]".into(), " ".into()],
                       placeholder: "Provide feedback message here".to_string(),
                       ..Default::default()
@@ -500,15 +353,21 @@ pub fn spawn_feedback_ui(
                     button(styles.surface, styles.border),
                   ))
                   .with_children(|b| {
+                    b.spawn((
+                      Text::new("Include screenshot: "),
+                      TextFont::from_font_size(14.),
+                      TextColor(styles.text_secondary),
+                    ));
                     b.spawn((Text::default(), Node::default())).with_children(|t| {
                       t.spawn((
-                        TextSpan::new("Include screenshot: No"),
+                        TextSpan::new("No"),
                         ScreenshotToggleText,
                         TextFont::from_font_size(14.),
                         TextColor(styles.secondary),
                       ));
                     });
-                  });
+                  })
+                  .observe(observe_screenshot_toggle_click);
               });
           }
 
@@ -541,7 +400,8 @@ pub fn spawn_feedback_ui(
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
                     t.spawn((TextSpan::new("Cancel"), TextFont::from_font_size(16.), TextColor(styles.text_secondary)));
                   });
-                });
+                })
+                .observe(observe_cancel_click);
 
               // Submit
               row
@@ -567,7 +427,8 @@ pub fn spawn_feedback_ui(
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
                     t.spawn((TextSpan::new("Send"), TextFont::from_font_size(16.), TextColor(styles.text_primary)));
                   });
-                });
+                })
+                .observe(observe_submit_click);
             });
         });
     });

@@ -1,7 +1,7 @@
 use bevy::{prelude::*, window::WindowCloseRequested};
 
 use crate::{
-  StartSessionEvent, observers::observe_start_session_event, resources::session::SessionApiKey,
+  StartSessionEvent, observers::session::observe_start_session_event, resources::session::SessionApiKey,
   systems::session::handle_exit_event,
 };
 
