@@ -3,6 +3,7 @@ use std::{ops::Deref, time::Instant};
 use bevy::{
   prelude::*,
   render::view::screenshot::{Screenshot, ScreenshotCaptured},
+  state::state::FreelyMutableState,
 };
 use bevy_mod_reqwest::ReqwestResponseEvent;
 use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
@@ -10,7 +11,7 @@ use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 use crate::{
   FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, SESSION_START_INSTANT,
   api_types::{FeedbackPayload, IdResponse},
-  primitives::feedback::{CategoryButtonText, CategoryItem, MessageInput, ScreenshotToggleText},
+  primitives::feedback::{CategoryButtonText, CategoryItem, FeedbackPanel, MessageInput, ScreenshotToggleText},
   resources::{
     feedback::{FeedbackFormState, TakeScreenshot},
     session::SessionApiKey,
@@ -18,6 +19,26 @@ use crate::{
   sysparam::BevyIndigauge,
   utils::select,
 };
+
+pub fn switch_state_on_feedback_spawn<S>(state: S) -> impl FnMut(Trigger<OnAdd, FeedbackPanel>, ResMut<NextState<S>>)
+where
+  S: FreelyMutableState + Copy,
+{
+  move |_trigger, mut next_state| {
+    next_state.set(state);
+  }
+}
+
+pub fn switch_state_on_feedback_despawn<S>(
+  state: S,
+) -> impl FnMut(Trigger<OnRemove, FeedbackPanel>, ResMut<NextState<S>>)
+where
+  S: FreelyMutableState + Copy,
+{
+  move |_trigger, mut next_state| {
+    next_state.set(state);
+  }
+}
 
 pub fn observe_category_dropdown_click(_trigger: Trigger<Pointer<Click>>, mut form: ResMut<FeedbackFormState>) {
   form.dropdown_open = !form.dropdown_open;

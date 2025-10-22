@@ -1,12 +1,9 @@
-use std::{panic::PanicHookInfo, time::Instant};
-
-use serde_json::json;
-
 use crate::{
   GLOBAL_TX, SESSION_START_INSTANT,
   api_types::{EventPayload, EventPayloadCtx},
   resources::events::QueuedEvent,
 };
+use std::time::Instant;
 
 pub fn select<T>(true_case: T, false_case: T, condition: bool) -> T {
   if condition { true_case } else { false_case }
@@ -205,8 +202,13 @@ pub const fn validate_event_type(s: &str) -> &str {
   s
 }
 
-#[cfg(feature = "panic_handler")]
-pub fn panic_handler(host_origin: String, session_api_key: String) -> impl Fn(&PanicHookInfo) + Send + Sync + 'static {
+#[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
+pub fn panic_handler(
+  host_origin: String,
+  session_api_key: String,
+) -> impl Fn(&std::panic::PanicHookInfo) + Send + Sync + 'static {
+  use serde_json::json;
+
   move |info| {
     if let Some(start_instant) = SESSION_START_INSTANT.get() {
       use crate::api_types::StartSessionResponse;
@@ -236,14 +238,19 @@ pub fn panic_handler(host_origin: String, session_api_key: String) -> impl Fn(&P
       };
 
       let single_event_endpoint = format!("{}/v1/events", host_origin);
-      let _ = ureq::post(&single_event_endpoint)
+      let client = reqwest::blocking::Client::new();
+      let _ = client
+        .post(&single_event_endpoint)
         .header("X-Indigauge-Key", &session_api_key)
-        .send_json(&payload);
+        .json(&payload)
+        .send();
 
       let end_session_endpoint = format!("{}/v1/sessions/end", host_origin);
-      let _ = ureq::post(&end_session_endpoint)
+      let _ = client
+        .post(&end_session_endpoint)
         .header("X-Indigauge-Key", &session_api_key)
-        .send_json(json!({"reason": "crashed"}));
+        .json(&json!({"reason": "crashed"}))
+        .send();
     }
   }
 }

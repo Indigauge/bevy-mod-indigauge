@@ -11,7 +11,10 @@ It’s designed to be easy to integrate and is powerful enough for production us
 - **Bevy 0.15 compatible** — easy drop-in plugin
 - Lightweight event macros: `ig_info!`, `ig_warn!`, `ig_error!`, …
 - Built-in **Feedback UI panel** for in-game bug reports & suggestions
-- Works on both **native** and **WASM** builds
+- Works on both **native** and **WASM** builds*
+
+> [!WARNING]
+> On wasm builds, the panic handler is disabled. No crash reports will be sent as events to the Indigauge API.
 
 ---
 

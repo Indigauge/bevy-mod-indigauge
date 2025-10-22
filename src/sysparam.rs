@@ -1,3 +1,4 @@
+#[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
 use std::fs;
 use std::time::Instant;
 
@@ -9,7 +10,6 @@ use bevy_mod_reqwest::reqwest::{Error as ReqwestError, Request};
 use bevy_mod_reqwest::{BevyReqwest, ReqwestErrorEvent, ReqwestResponseEvent};
 use serde::Serialize;
 use serde_json::json;
-use uuid::Uuid;
 
 use crate::api_types::{BatchEventPayload, FeedbackPayload};
 use crate::resources::events::BufferedEvents;
@@ -137,8 +137,15 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
           self
             .reqwest_client
             .send(request)
-            .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
-              dbg!(trigger.event().body());
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Event batch sent successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send event batch", ?status);
+              }
             })
             .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
               if *log_level <= IndigaugeLogLevel::Error {
@@ -166,8 +173,15 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
           self
             .reqwest_client
             .send(request)
-            .on_response(|trigger: Trigger<ReqwestResponseEvent>| {
-              dbg!("heartbeat response: {:?}", trigger.event().body());
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Heartbeat sent successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to update heartbeat", ?status);
+              }
             })
             .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
               if *log_level <= IndigaugeLogLevel::Error {
@@ -185,7 +199,9 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
     }
   }
 
+  #[cfg(not(target_family = "wasm"))]
   pub fn get_or_init_player_id(&self) -> String {
+    use uuid::Uuid;
     let game_folder_path = dirs::preference_dir().map(|dir| dir.join(&self.config.game_name));
 
     if let Some(game_folder_path) = game_folder_path {

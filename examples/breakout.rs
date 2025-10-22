@@ -4,7 +4,10 @@ use bevy::{
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
 };
-use bevy_mod_indigauge::{FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info};
+use bevy_mod_indigauge::{
+  FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info,
+  switch_state_on_feedback_despawn, switch_state_on_feedback_spawn,
+};
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -52,6 +55,7 @@ enum GameState {
   #[default]
   InitializeSession,
   Playing,
+  Paused,
 }
 
 fn main() {
@@ -66,6 +70,10 @@ fn main() {
         .add_systems(OnEnter(GameState::InitializeSession), init_session)
         .add_systems(OnEnter(GameState::Playing), setup_game)
         .add_observer(transition_to_playing)
+        // Switch to paused state when feedback is spawned
+        .add_observer(switch_state_on_feedback_spawn(GameState::Paused))
+        // Switch back to playing state when feedback is despawned
+        .add_observer(switch_state_on_feedback_despawn(GameState::Playing))
         // Add our gameplay simulation systems to the fixed timestep schedule
         // which runs at 64 Hz by default
         .add_systems(
@@ -194,8 +202,11 @@ fn setup_game(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
   asset_server: Res<AssetServer>,
+  mut has_been_setup: Local<bool>,
 ) {
-  commands.insert_resource(FeedbackPanelProps::visible());
+  if *has_been_setup {
+    return;
+  }
 
   // Sound
   let ball_collision_sound = asset_server.load("sounds/breakout_collision.ogg");
@@ -306,6 +317,8 @@ fn setup_game(
       ));
     }
   }
+
+  *has_been_setup = true;
 }
 
 fn move_paddle(

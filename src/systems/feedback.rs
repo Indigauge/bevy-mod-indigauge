@@ -68,10 +68,12 @@ pub fn handle_hover_and_click_styles(mut commands: Commands, mut q: HoverAndClic
     |(interaction, entity, mut bg_color, mut border_color, bhs, bps, obs, hold_after_press, is_active)| {
       match *interaction {
         Interaction::Hovered => {
-          commands.entity(entity).insert_if_new(OriginalButtonStyles {
-            background: bg_color.0,
-            border: border_color.0,
-          });
+          if let Some(mut ecm) = commands.get_entity(entity) {
+            ecm.try_insert_if_new(OriginalButtonStyles {
+              background: bg_color.0,
+              border: border_color.0,
+            });
+          }
 
           if !is_active && let Some(hover_style) = bhs {
             bg_color.0 = hover_style.background;
@@ -84,8 +86,8 @@ pub fn handle_hover_and_click_styles(mut commands: Commands, mut q: HoverAndClic
             border_color.0 = pressed_style.border;
           }
 
-          if hold_after_press {
-            commands.entity(entity).insert(Active);
+          if hold_after_press && let Some(mut ecm) = commands.get_entity(entity) {
+            ecm.try_insert(Active);
           }
         },
         _ => {

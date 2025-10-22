@@ -44,7 +44,11 @@ pub fn observe_start_session_event(
     _ => {},
   }
 
-  let player_id = ig.get_or_init_player_id();
+  #[cfg(not(target_family = "wasm"))]
+  let player_id = Some(ig.get_or_init_player_id());
+
+  #[cfg(target_family = "wasm")]
+  let player_id = None::<String>;
 
   let event = event.event();
   let cores = sys_info.core_count.parse().map(bucket_cores).ok();
@@ -58,7 +62,7 @@ pub fn observe_start_session_event(
 
   let payload = StartSessionPayload {
     client_version: &ig.config.game_version,
-    player_id: Some(&player_id),
+    player_id: player_id.as_ref(),
     platform: event.platform.as_ref(),
     os: Some(OS),
     locale: event.locale.as_ref(),
@@ -153,7 +157,7 @@ fn start_session(
 
   let key = response.session_token.clone();
 
-  #[cfg(feature = "panic_handler")]
+  #[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
   {
     use crate::utils::panic_handler;
 
