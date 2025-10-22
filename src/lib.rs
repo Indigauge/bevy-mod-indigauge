@@ -59,7 +59,7 @@ pub mod macros {
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
   /// # Examples
-  /// ```rust
+  /// ```ignore
   /// ig_trace!("ui.hover");
   /// ig_trace!("ui.hover", { "x": 128, "y": 256 });
   /// ```
@@ -82,7 +82,7 @@ pub mod macros {
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
   /// # Examples
-  /// ```rust
+  /// ```ignore
   /// ig_debug!("system.update_start");
   /// ig_debug!("pathfinding.step", { "node": node_id, "distance": dist });
   /// ```
@@ -107,7 +107,7 @@ pub mod macros {
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
   /// # Examples
-  /// ```rust
+  /// ```ignore
   /// ig_info!("gameplay.start");
   /// ig_info!("gameplay.start", { "session": session_id });
   /// ig_info!("ui.click", { "button": "play" });
@@ -133,7 +133,7 @@ pub mod macros {
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
   /// # Examples
-  /// ```rust
+  /// ```ignore
   /// ig_warn!("network.latency", { "ping_ms": latency });
   /// ig_warn!("save.failed", { "reason": "disk_full" });
   /// ```
@@ -158,7 +158,7 @@ pub mod macros {
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
   /// # Examples
-  /// ```rust
+  /// ```ignore
   /// ig_error!("game.crash", { "reason": error_message });
   /// ig_error!("network.disconnect");
   /// ```

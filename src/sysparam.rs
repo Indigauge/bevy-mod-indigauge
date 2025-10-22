@@ -201,6 +201,7 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
 
   #[cfg(not(target_family = "wasm"))]
   pub fn get_or_init_player_id(&self) -> String {
+    use std::fs;
     use uuid::Uuid;
     let game_folder_path = dirs::preference_dir().map(|dir| dir.join(&self.config.game_name));
 
