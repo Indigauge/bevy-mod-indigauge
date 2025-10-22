@@ -67,7 +67,7 @@ impl Default for FeedbackPanelStyles {
 ///
 /// ```rust
 /// use bevy::prelude::*;
-/// use indigauge_client::{FeedbackPanelProps, FeedbackCategory};
+/// use bevy_mod_indigauge::{FeedbackPanelProps, FeedbackCategory};
 ///
 /// fn trigger_feedback_with_question(
 ///     mut commands: Commands,

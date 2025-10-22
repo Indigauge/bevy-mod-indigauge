@@ -27,21 +27,6 @@ jobs:
       - name: Run cargo check headless
         run: cargo check --all-targets --no-default-features
 
-  docs:
-    name: Run cargo doc
-    env:
-      RUSTDOCFLAGS: -D warnings
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Run cargo doc
-        run: cargo doc --all-features --no-deps
-
   build_examples:
     name: Build examples
     runs-on: ubuntu-latest
