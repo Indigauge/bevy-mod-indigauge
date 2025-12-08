@@ -1,5 +1,3 @@
-#[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
-use std::fs;
 use std::time::Instant;
 
 use bevy::ecs::bundle::Bundle;
@@ -27,7 +25,7 @@ pub struct BevyIndigauge<'w, 's> {
 }
 
 impl<'w, 's> BevyIndigauge<'w, 's> {
-  pub fn build_request<S>(&self, url: &str, ig_key: &str, payload: &S) -> Result<Request, ReqwestError>
+  pub fn build_post_request<S>(&self, url: &str, ig_key: &str, payload: &S) -> Result<Request, ReqwestError>
   where
     S: Serialize,
   {
@@ -36,6 +34,22 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
     self
       .reqwest_client
       .post(url)
+      .timeout(self.config.request_timeout)
+      .header("Content-Type", "application/json")
+      .header("X-Indigauge-Key", ig_key)
+      .json(payload)
+      .build()
+  }
+
+  pub fn build_patch_request<S>(&self, url: &str, ig_key: &str, payload: &S) -> Result<Request, ReqwestError>
+  where
+    S: Serialize,
+  {
+    let url = format!("{}/v1/{}", &self.config.api_base, url);
+
+    self
+      .reqwest_client
+      .patch(url)
       .timeout(self.config.request_timeout)
       .header("Content-Type", "application/json")
       .header("X-Indigauge-Key", ig_key)
@@ -95,7 +109,7 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
   {
     match *self.mode {
       IndigaugeMode::Live => {
-        if let Ok(request) = self.build_request("feedback", api_key, payload) {
+        if let Ok(request) = self.build_post_request("feedback", api_key, payload) {
           self.last_sent_request.instant = Instant::now();
           self.reqwest_client.send(request).on_response(on_response).on_error(
             |trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
@@ -132,7 +146,7 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
 
     match *self.mode {
       IndigaugeMode::Live => {
-        if let Ok(request) = self.build_request("events/batch", api_key, &events) {
+        if let Ok(request) = self.build_post_request("events/batch", api_key, &events) {
           self.last_sent_request.instant = Instant::now();
           self
             .reqwest_client
@@ -168,7 +182,7 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
   pub fn send_heartbeat(&mut self, api_key: &str) {
     match *self.mode {
       IndigaugeMode::Live => {
-        if let Ok(request) = self.build_request("sessions/heartbeat", api_key, &json!({})) {
+        if let Ok(request) = self.build_post_request("sessions/heartbeat", api_key, &json!({})) {
           self.last_sent_request.instant = Instant::now();
           self
             .reqwest_client
@@ -193,6 +207,53 @@ impl<'w, 's> BevyIndigauge<'w, 's> {
       IndigaugeMode::Dev => {
         if *self.log_level <= IndigaugeLogLevel::Info {
           info!("DEVMODE: heartbeat");
+        }
+      },
+      _ => {},
+    }
+  }
+
+  pub fn update_metadata<T>(&mut self, meta: &T, api_key: &str)
+  where
+    T: Serialize,
+  {
+    let metadata = match serde_json::to_value(meta) {
+      Ok(json) => json,
+      Err(error) => {
+        if *self.log_level <= IndigaugeLogLevel::Error {
+          error!(message = "Failed to serialize metadata", ?error);
+        }
+        return;
+      },
+    };
+
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_patch_request("sessions", api_key, &metadata) {
+          self.last_sent_request.instant = Instant::now();
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Metadata updated successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to update metadata", ?status);
+              }
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send session metadata update", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: update metadata", ?metadata);
         }
       },
       _ => {},

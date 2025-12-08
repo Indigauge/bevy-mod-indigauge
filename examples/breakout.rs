@@ -5,9 +5,10 @@ use bevy::{
   prelude::*,
 };
 use bevy_mod_indigauge::{
-  FeedbackPanelProps, IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, ig_info,
-  switch_state_on_feedback_despawn, switch_state_on_feedback_spawn,
+  IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, switch_state_on_feedback_despawn,
+  switch_state_on_feedback_spawn,
 };
+use serde::Serialize;
 
 // These constants are defined in `Transform` units.
 // Using the default 2D camera they correspond 1:1 with screen pixels.
@@ -62,8 +63,8 @@ fn main() {
   App::new()
         .add_plugins(DefaultPlugins)
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::default())
-        .insert_resource(Score(0))
+        .add_plugins(IndigaugePlugin::<Score>::default())
+        .insert_resource(Score::default())
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
         .add_systems(Startup, setup_camera)
@@ -178,8 +179,10 @@ impl WallBundle {
 }
 
 // This resource tracks the game's score
-#[derive(Resource, Deref, DerefMut)]
-struct Score(usize);
+#[derive(Resource, Deref, DerefMut, Default, Serialize)]
+struct Score {
+  score: usize,
+}
 
 #[derive(Component)]
 struct ScoreboardUi;
@@ -384,8 +387,8 @@ fn check_for_collisions(
       // Bricks should be despawned and increment the scoreboard on collision
       if maybe_brick.is_some() {
         commands.entity(collider_entity).despawn();
-        **score += 1;
-        ig_info!("score.increase", { "score" : &**score });
+        score.score += 1;
+        // ig_info!("score.increase", { "score" : &**score });
       }
 
       // if **score > 4 {

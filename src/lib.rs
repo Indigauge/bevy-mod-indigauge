@@ -22,7 +22,7 @@ pub use plugins::IndigaugePlugin;
 pub use primitives::feedback::FeedbackCategory;
 pub use primitives::{IndigaugeInitDoneEvent, session::StartSessionEvent};
 pub use resources::feedback::{FeedbackKeyCodeToggle, FeedbackPanelProps, FeedbackPanelStyles};
-pub use resources::{IndigaugeLogLevel, IndigaugeMode};
+pub use resources::{IndigaugeLogLevel, IndigaugeMode, session::EmptySessionMeta};
 
 pub mod macros {
   #[macro_export]

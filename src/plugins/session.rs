@@ -1,17 +1,48 @@
-use bevy::{prelude::*, window::WindowCloseRequested};
+use std::{marker::PhantomData, time::Duration};
+
+use bevy::{prelude::*, time::common_conditions::on_timer, window::WindowCloseRequested};
+use serde::Serialize;
 
 use crate::{
-  StartSessionEvent, observers::session::observe_start_session_event, resources::session::SessionApiKey,
-  systems::session::handle_exit_event,
+  StartSessionEvent,
+  observers::session::observe_start_session_event,
+  resources::session::{SessionApiKey, SessionMeta},
+  systems::session::{handle_exit_event, handle_updated_metadata, update_metadata},
 };
 
-pub struct SessionPlugin;
+pub struct SessionPlugin<M: Resource + Serialize> {
+  m: PhantomData<M>,
+  flush_interval: Duration,
+}
 
-impl Plugin for SessionPlugin {
+impl<M> SessionPlugin<M>
+where
+  M: Resource + Serialize,
+{
+  pub fn new(flush_interval: Duration) -> Self {
+    Self {
+      m: Default::default(),
+      flush_interval,
+    }
+  }
+}
+
+impl<M> Plugin for SessionPlugin<M>
+where
+  M: Resource + Serialize,
+{
   fn build(&self, app: &mut App) {
     app
+      .insert_resource(SessionMeta::<M>::default())
       .add_event::<StartSessionEvent>()
       .add_observer(observe_start_session_event)
+      .add_systems(
+        Update,
+        (
+          handle_updated_metadata::<M>.run_if(resource_exists_and_changed::<M>),
+          update_metadata::<M>.run_if(on_timer(self.flush_interval)),
+        ),
+      )
       .add_systems(
         PostUpdate,
         (handle_exit_event::<AppExit>, handle_exit_event::<WindowCloseRequested>)

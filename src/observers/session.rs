@@ -65,14 +65,13 @@ pub fn observe_start_session_event(
     player_id: player_id.as_ref(),
     platform: event.platform.as_ref(),
     os: Some(OS),
-    locale: event.locale.as_ref(),
     cpu_family: cpu_family.as_ref(),
     cores,
     memory,
     gpu: Some(&render_info.name),
   };
 
-  let reqwest_client = ig.build_request("sessions/start", &ig.config.public_key, &payload);
+  let reqwest_client = ig.build_post_request("sessions/start", &ig.config.public_key, &payload);
 
   match reqwest_client {
     Ok(reqwest_client) => {

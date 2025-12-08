@@ -2,15 +2,15 @@ use std::time::Duration;
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_mod_indigauge::{
-  FeedbackCategory, FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, IndigaugeMode, IndigaugePlugin,
-  StartSessionEvent, ig_info,
+  EmptySessionMeta, FeedbackCategory, FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, IndigaugeMode,
+  IndigaugePlugin, StartSessionEvent, ig_info,
 };
 
 fn main() {
   App::new()
     .add_plugins(DefaultPlugins)
     .add_plugins(
-      IndigaugePlugin::new(
+      IndigaugePlugin::<EmptySessionMeta>::new(
         "YOUR_PUBLIC_KEY",
         Some("Your game name (defaults to `CARGO_PKG_NAME` if not provided)".to_string()),
         Some("Your game version (defaults to `CARGO_PKG_VERSION` if not provided)".to_string())
@@ -43,7 +43,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
   commands.spawn((Camera2d, IsDefaultUiCamera));
-  commands.trigger(StartSessionEvent::new().with_locale("en-US").with_platform("steam"));
+  commands.trigger(StartSessionEvent::new().with_platform("steam"));
 
   const HELP_TEXT_DEFAULT: &str = "Press 'F2' to display the default feedback panel!\n";
   const HELP_TEXT_WITH_QUESTION: &str = "Press 'SPACE' to display the feedback panel with a question!\n";

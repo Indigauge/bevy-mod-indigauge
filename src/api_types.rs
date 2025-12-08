@@ -53,7 +53,6 @@ pub struct StartSessionPayload<'a> {
   pub cores: Option<&'a str>,
   pub memory: Option<&'a str>,
   pub gpu: Option<&'a String>,
-  pub locale: Option<&'a String>,
 }
 
 #[derive(Serialize, Clone, Debug)]

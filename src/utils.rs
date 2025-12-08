@@ -266,7 +266,7 @@ pub fn enqueue(
 ) -> bool {
   let tx = match GLOBAL_TX.get() {
     Some(tx) => tx.clone(),
-    None => return false, // ikke initialisert enda
+    None => return false,
   };
 
   if let Some(start_instant) = SESSION_START_INSTANT.get() {
@@ -288,7 +288,6 @@ pub fn enqueue(
       context,
     };
 
-    // Bounded channel: send uten await (best effort)
     tx.try_send(QueuedEvent::new(payload)).is_ok()
   } else {
     false

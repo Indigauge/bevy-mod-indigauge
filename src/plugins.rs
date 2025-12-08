@@ -1,6 +1,9 @@
+use std::marker::PhantomData;
+
 use bevy::prelude::*;
 use bevy_mod_reqwest::ReqwestPlugin;
 use crossbeam_channel::bounded;
+use serde::Serialize;
 
 use crate::{
   GLOBAL_TX,
@@ -8,6 +11,7 @@ use crate::{
   resources::{
     IndigaugeConfig, IndigaugeLogLevel, IndigaugeMode, LastSentRequestInstant,
     events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
+    session::EmptySessionMeta,
   },
 };
 
@@ -15,25 +19,17 @@ mod events;
 mod feedback;
 mod session;
 
-pub struct IndigaugePlugin {
+pub struct IndigaugePlugin<Meta = EmptySessionMeta> {
   public_key: String,
   /// Defaults to cargo package name
   game_name: String,
   game_version: String,
   log_level: IndigaugeLogLevel,
   mode: IndigaugeMode,
+  meta: PhantomData<Meta>,
 }
 
-impl IndigaugePlugin {
-  pub fn new(public_key: impl Into<String>, game_name: Option<String>, game_version: Option<String>) -> Self {
-    Self {
-      public_key: public_key.into(),
-      game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
-      game_version: game_version.unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
-      ..Default::default()
-    }
-  }
-
+impl<M> IndigaugePlugin<M> {
   pub fn log_level(mut self, log_level: IndigaugeLogLevel) -> Self {
     self.log_level = log_level;
     self
@@ -45,7 +41,24 @@ impl IndigaugePlugin {
   }
 }
 
-impl Default for IndigaugePlugin {
+impl<M> IndigaugePlugin<M>
+where
+  M: Resource + Serialize,
+{
+  pub fn new(public_key: impl Into<String>, game_name: Option<String>, game_version: Option<String>) -> Self {
+    Self {
+      public_key: public_key.into(),
+      game_name: game_name.unwrap_or_else(|| env!("CARGO_PKG_NAME").to_string()),
+      game_version: game_version.unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
+      ..Default::default()
+    }
+  }
+}
+
+impl<M> Default for IndigaugePlugin<M>
+where
+  M: Resource + Serialize,
+{
   fn default() -> Self {
     Self {
       game_name: env!("CARGO_PKG_NAME").to_string(),
@@ -56,11 +69,15 @@ impl Default for IndigaugePlugin {
       game_version: env!("CARGO_PKG_VERSION").to_string(),
       log_level: IndigaugeLogLevel::Info,
       mode: IndigaugeMode::default(),
+      meta: PhantomData,
     }
   }
 }
 
-impl Plugin for IndigaugePlugin {
+impl<M> Plugin for IndigaugePlugin<M>
+where
+  M: Resource + Serialize,
+{
   fn build(&self, app: &mut App) {
     let config = IndigaugeConfig::new(&self.game_name, &self.public_key, &self.game_version);
 
@@ -79,7 +96,11 @@ impl Plugin for IndigaugePlugin {
 
     app
       .add_plugins(ReqwestPlugin::default())
-      .add_plugins((FeedbackUiPlugin, EventsPlugin::new(config.flush_interval), SessionPlugin))
+      .add_plugins((
+        FeedbackUiPlugin,
+        EventsPlugin::new(config.flush_interval),
+        SessionPlugin::<M>::new(config.flush_interval),
+      ))
       .insert_resource(self.log_level.clone())
       .insert_resource(BufferedEvents::default())
       .insert_resource(LastSentRequestInstant::new())
