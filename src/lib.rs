@@ -59,7 +59,7 @@ pub mod macros {
   ///
   /// * `<event_type>` — must be a string literal formatted as `"namespace.event"`,
   ///   e.g. `"ui.click"`, `"gameplay.start"`.
-  ///   The value is compile-time validated by [`validate_event_type`] to ensure
+  ///   The value is compile-time validated by [`crate::utils::validate_event_type`] to ensure
   ///   it contains exactly one `.` and only letters on each side.
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
@@ -82,7 +82,7 @@ pub mod macros {
   ///
   /// * `<event_type>` — must be a string literal formatted as `"namespace.event"`,
   ///   e.g. `"ui.click"`, `"gameplay.start"`.
-  ///   The value is compile-time validated by [`validate_event_type`] to ensure
+  ///   The value is compile-time validated by [`crate::utils::validate_event_type`] to ensure
   ///   it contains exactly one `.` and only letters on each side.
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
@@ -107,7 +107,7 @@ pub mod macros {
   ///
   /// * `<event_type>` — must be a string literal formatted as `"namespace.event"`,
   ///   e.g. `"ui.click"`, `"gameplay.start"`.
-  ///   The value is compile-time validated by [`validate_event_type`] to ensure
+  ///   The value is compile-time validated by [`crate::utils::validate_event_type`] to ensure
   ///   it contains exactly one `.` and only letters on each side.
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
@@ -133,7 +133,7 @@ pub mod macros {
   ///
   /// * `<event_type>` — must be a string literal formatted as `"namespace.event"`,
   ///   e.g. `"ui.click"`, `"gameplay.start"`.
-  ///   The value is compile-time validated by [`validate_event_type`] to ensure
+  ///   The value is compile-time validated by [`crate::utils::validate_event_type`] to ensure
   ///   it contains exactly one `.` and only letters on each side.
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
@@ -158,7 +158,7 @@ pub mod macros {
   ///
   /// * `<event_type>` — must be a string literal formatted as `"namespace.event"`,
   ///   e.g. `"ui.click"`, `"gameplay.start"`.
-  ///   The value is compile-time validated by [`validate_event_type`] to ensure
+  ///   The value is compile-time validated by [`crate::utils::validate_event_type`] to ensure
   ///   it contains exactly one `.` and only letters on each side.
   /// * Optional metadata can be passed as a JSON-like key/value list.
   ///
