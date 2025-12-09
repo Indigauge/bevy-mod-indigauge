@@ -155,10 +155,10 @@ fn start_session(
   if *log_level <= IndigaugeLogLevel::Info {
     match *mode {
       IndigaugeMode::Live => {
-        info!(message = "Indigauge session started", start_instant = ?start_instant);
+        info!(message = "Indigauge session started");
       },
       IndigaugeMode::Dev => {
-        info!(message = "DEVMODE: Indigauge session started", start_instant = ?start_instant);
+        info!(message = "DEVMODE: Indigauge session started");
       },
       IndigaugeMode::Disabled => {},
     }

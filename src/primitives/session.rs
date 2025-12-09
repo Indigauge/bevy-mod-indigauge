@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Event, Default)]
+#[derive(Event, Default, Clone)]
 pub struct StartSessionEvent {
   pub platform: Option<String>,
 }

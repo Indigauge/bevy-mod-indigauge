@@ -60,12 +60,12 @@ fn main() {
   App::new()
         .add_plugins(DefaultPlugins)
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::<Score>::default().mode(IndigaugeMode::Dev))
+        .add_plugins(IndigaugePlugin::<Score>::default().mode(IndigaugeMode::Live))
         .insert_resource(Score::default())
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
         .add_systems(Startup, setup_camera)
-        .add_systems(OnEnter(GameState::InitializeSession), init_session)
+        .add_systems(OnEnter(GameState::InitializeSession), start_default_session)
         .add_systems(OnEnter(GameState::Playing), setup_game)
         .add_observer(switch_state_after_session_init(GameState::Playing))
         // Switch to paused state when feedback is spawned
@@ -180,10 +180,6 @@ struct Score {
 
 #[derive(Component)]
 struct ScoreboardUi;
-
-fn init_session(mut commands: Commands) {
-  commands.trigger(StartSessionEvent::default());
-}
 
 fn setup_camera(mut commands: Commands) {
   commands.spawn((Camera2d, IsDefaultUiCamera));

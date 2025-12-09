@@ -27,6 +27,7 @@ pub mod prelude {
     FeedbackKeyCodeToggle, FeedbackPanelProps, FeedbackPanelStyles, FeedbackSpawnPosition,
   };
   pub use crate::resources::{IndigaugeLogLevel, IndigaugeMode, session::EmptySessionMeta};
+  pub use crate::systems::session::{end_session, start_default_session};
 }
 pub mod macros {
   #[macro_export]
