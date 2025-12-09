@@ -136,6 +136,7 @@ pub fn on_start_session_error(
   commands.trigger(IndigaugeInitDoneEvent::Failure("Create session post request failed".to_string()));
 }
 
+#[allow(unused_variables)]
 fn start_session(
   commands: &mut Commands,
   response: StartSessionResponse,
