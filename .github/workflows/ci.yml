@@ -45,7 +45,7 @@ jobs:
           sudo apt-get update; sudo apt-get install pkg-config libx11-dev libasound2-dev libudev-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
       - name: Run cargo doc
-        run: cargo doc --no-deps --all-targets
+        run: cargo doc --no-deps --all-features
 
   clippy_check:
     runs-on: ubuntu-latest
@@ -57,6 +57,7 @@ jobs:
   build_examples:
     name: Build examples
     runs-on: ubuntu-latest
+    needs: [check, docs, clippy_check, test]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -79,6 +80,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
 
     runs-on: ${{ matrix.os }}
+    needs: [check, docs, clippy_check]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
