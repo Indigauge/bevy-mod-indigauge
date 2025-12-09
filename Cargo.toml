@@ -11,6 +11,11 @@ keywords = ["indigauge", "feedback", "events", "indie", "game"]
 categories = ["development-tools", "game-development"]
 readme = "README.md"
 
+include = ["src/**/*", "README.md", "LICENSE", "Cargo.toml"]
+
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["panic_handler"]
 panic_handler = ["dep:reqwest"]
