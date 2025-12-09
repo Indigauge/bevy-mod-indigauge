@@ -4,10 +4,7 @@ use bevy::{
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
 };
-use bevy_mod_indigauge::{
-  IndigaugeInitDoneEvent, IndigaugePlugin, StartSessionEvent, switch_state_on_feedback_despawn,
-  switch_state_on_feedback_spawn,
-};
+use bevy_mod_indigauge::{ig_info, prelude::*};
 use serde::Serialize;
 
 // These constants are defined in `Transform` units.
@@ -63,14 +60,14 @@ fn main() {
   App::new()
         .add_plugins(DefaultPlugins)
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::<Score>::default())
+        .add_plugins(IndigaugePlugin::<Score>::default().mode(IndigaugeMode::Dev))
         .insert_resource(Score::default())
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
         .add_systems(Startup, setup_camera)
         .add_systems(OnEnter(GameState::InitializeSession), init_session)
         .add_systems(OnEnter(GameState::Playing), setup_game)
-        .add_observer(transition_to_playing)
+        .add_observer(switch_state_after_session_init(GameState::Playing))
         // Switch to paused state when feedback is spawned
         .add_observer(switch_state_on_feedback_spawn(GameState::Paused))
         // Switch back to playing state when feedback is despawned
@@ -88,7 +85,7 @@ fn main() {
                 // `chain`ing systems together runs them in order
                 .chain().run_if(in_state(GameState::Playing)),
         )
-        .add_systems(Update, update_scoreboard.run_if(in_state(GameState::Playing)))
+        .add_systems(Update, (update_scoreboard.run_if(in_state(GameState::Playing)), spawn_bug_report_feedback_panel))
         .run();
 }
 
@@ -109,9 +106,6 @@ struct CollisionEvent;
 
 #[derive(Component)]
 struct Brick;
-
-#[derive(Resource, Deref)]
-struct CollisionSound(Handle<AudioSource>);
 
 // This bundle is a collection of the components that define a "wall" in our game
 #[derive(Bundle)]
@@ -195,25 +189,16 @@ fn setup_camera(mut commands: Commands) {
   commands.spawn((Camera2d, IsDefaultUiCamera));
 }
 
-fn transition_to_playing(_ev: Trigger<IndigaugeInitDoneEvent>, mut state: ResMut<NextState<GameState>>) {
-  state.set(GameState::Playing);
-}
-
 // Add the game's entities to our world
 fn setup_game(
   mut commands: Commands,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
-  asset_server: Res<AssetServer>,
   mut has_been_setup: Local<bool>,
 ) {
   if *has_been_setup {
     return;
   }
-
-  // Sound
-  let ball_collision_sound = asset_server.load("sounds/breakout_collision.ogg");
-  commands.insert_resource(CollisionSound(ball_collision_sound));
 
   // Paddle
   let paddle_y = BOTTOM_WALL + GAP_BETWEEN_PADDLE_AND_FLOOR;
@@ -237,6 +222,29 @@ fn setup_game(
     Ball,
     Velocity(INITIAL_BALL_DIRECTION.normalize() * BALL_SPEED),
   ));
+
+  // Feedback help
+  [
+    ("Trigger default feedback form with `F2`", Val::Px(30.)),
+    ("Trigger custom bug report feedback form with `F3`", SCOREBOARD_TEXT_PADDING),
+  ]
+  .into_iter()
+  .for_each(|(txt, margin)| {
+    commands.spawn((
+      Text::new(txt),
+      TextFont {
+        font_size: 18.,
+        ..default()
+      },
+      TextColor(TEXT_COLOR),
+      Node {
+        position_type: PositionType::Absolute,
+        bottom: margin,
+        left: SCOREBOARD_TEXT_PADDING,
+        ..default()
+      },
+    ));
+  });
 
   // Scoreboard
   commands
@@ -324,6 +332,18 @@ fn setup_game(
   *has_been_setup = true;
 }
 
+fn spawn_bug_report_feedback_panel(mut commands: Commands, keys: Res<ButtonInput<KeyCode>>) {
+  if keys.just_pressed(KeyCode::F3) {
+    commands.insert_resource(
+      FeedbackPanelProps::with_question("What's wrong?", FeedbackCategory::Bugs)
+        .title("Bug Report")
+        .allow_screenshot(true)
+        .spawn_position(FeedbackSpawnPosition::TopRight)
+        .margin(UiRect::all(Val::Px(3.))),
+    );
+  }
+}
+
 fn move_paddle(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut paddle_transform: Single<&mut Transform, With<Paddle>>,
@@ -388,13 +408,8 @@ fn check_for_collisions(
       if maybe_brick.is_some() {
         commands.entity(collider_entity).despawn();
         score.score += 1;
-        // ig_info!("score.increase", { "score" : &**score });
+        ig_info!("hit.brick");
       }
-
-      // if **score > 4 {
-      //   let b = maybe_brick.unwrap();
-      //   dbg!("Should panic");
-      // }
 
       // Reflect the ball's velocity when it collides
       let mut reflect_x = false;
@@ -422,16 +437,11 @@ fn check_for_collisions(
   }
 }
 
-fn play_collision_sound(
-  mut commands: Commands,
-  mut collision_events: EventReader<CollisionEvent>,
-  sound: Res<CollisionSound>,
-) {
+fn play_collision_sound(mut collision_events: EventReader<CollisionEvent>) {
   // Play a sound once per frame if a collision occurred.
   if !collision_events.is_empty() {
     // This prevents events staying active on the next frame.
     collision_events.clear();
-    commands.spawn((AudioPlayer(sound.clone()), PlaybackSettings::DESPAWN));
   }
 }
 

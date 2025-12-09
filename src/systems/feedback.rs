@@ -27,14 +27,9 @@ pub fn toggle_panel_visibility_with_key(
   mut commands: Commands,
   keys: Res<ButtonInput<KeyCode>>,
   toggle_button: Res<FeedbackKeyCodeToggle>,
-  props: Option<ResMut<FeedbackPanelProps>>,
 ) {
   if keys.just_pressed(toggle_button.0) {
-    if let Some(mut props) = props {
-      props.visible = !props.visible;
-    } else {
-      commands.insert_resource(FeedbackPanelProps::visible());
-    }
+    commands.insert_resource(FeedbackPanelProps::default());
   }
 }
 
@@ -157,8 +152,8 @@ pub fn spawn_feedback_ui(
       Node {
         width: Val::Percent(100.0),
         height: Val::Percent(100.0),
-        align_items: AlignItems::Center,
-        justify_content: JustifyContent::Center,
+        align_items: props.spawn_position.align_items(),
+        justify_content: props.spawn_position.justify_content(),
         ..default()
       },
       BackgroundColor(Color::NONE),
@@ -171,6 +166,7 @@ pub fn spawn_feedback_ui(
           Node {
             width: Val::Px(420.0),
             min_height: Val::Px(420.0),
+            margin: props.position_margin,
             padding: UiRect::axes(Val::Px(48.0), Val::Px(32.0)),
             border: UiRect::all(Val::Px(2.0)),
             flex_direction: FlexDirection::Column,
@@ -190,8 +186,8 @@ pub fn spawn_feedback_ui(
           }
 
           if let Some(question) = &props.question {
-            let size = select(22., 18., props.title.is_some());
-            let color = select(styles.text_primary, styles.text_secondary, props.title.is_some());
+            let size = select(18., 22., props.title.is_some());
+            let color = select(styles.text_secondary, styles.text_primary, props.title.is_some());
 
             child_panel
               .spawn((Text::default(), Node::default()))
@@ -378,7 +374,7 @@ pub fn spawn_feedback_ui(
             .spawn((
               Node {
                 width: Val::Percent(100.0),
-                justify_content: JustifyContent::End,
+                justify_content: JustifyContent::SpaceAround,
                 align_items: AlignItems::Center,
                 column_gap: Val::Px(8.0),
                 margin: UiRect::top(Val::Px(15.)),
@@ -427,7 +423,11 @@ pub fn spawn_feedback_ui(
                 ))
                 .with_children(|b| {
                   b.spawn((Text::default(), Node::default())).with_children(|t| {
-                    t.spawn((TextSpan::new("Send"), TextFont::from_font_size(16.), TextColor(styles.text_primary)));
+                    t.spawn((
+                      TextSpan::new("Submit Feedback"),
+                      TextFont::from_font_size(16.),
+                      TextColor(styles.text_primary),
+                    ));
                   });
                 })
                 .observe(observe_submit_click);

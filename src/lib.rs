@@ -3,7 +3,7 @@ use std::time::Instant;
 use crossbeam_channel::Sender;
 use once_cell::sync::OnceCell;
 
-use crate::resources::{LastSentRequestInstant, events::QueuedEvent};
+use crate::resources::events::QueuedEvent;
 
 mod api_types;
 mod observers;
@@ -17,13 +17,17 @@ pub mod utils;
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
 pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
 
-pub use observers::feedback::{switch_state_on_feedback_despawn, switch_state_on_feedback_spawn};
-pub use plugins::IndigaugePlugin;
-pub use primitives::feedback::FeedbackCategory;
-pub use primitives::{IndigaugeInitDoneEvent, session::StartSessionEvent};
-pub use resources::feedback::{FeedbackKeyCodeToggle, FeedbackPanelProps, FeedbackPanelStyles};
-pub use resources::{IndigaugeLogLevel, IndigaugeMode, session::EmptySessionMeta};
-
+pub mod prelude {
+  pub use crate::observers::feedback::{switch_state_on_feedback_despawn, switch_state_on_feedback_spawn};
+  pub use crate::observers::session::switch_state_after_session_init;
+  pub use crate::plugins::IndigaugePlugin;
+  pub use crate::primitives::feedback::FeedbackCategory;
+  pub use crate::primitives::{IndigaugeInitDoneEvent, session::StartSessionEvent};
+  pub use crate::resources::feedback::{
+    FeedbackKeyCodeToggle, FeedbackPanelProps, FeedbackPanelStyles, FeedbackSpawnPosition,
+  };
+  pub use crate::resources::{IndigaugeLogLevel, IndigaugeMode, session::EmptySessionMeta};
+}
 pub mod macros {
   #[macro_export]
   macro_rules! enqueue_ig_event {

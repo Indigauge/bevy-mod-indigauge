@@ -2,8 +2,11 @@ use std::time::Duration;
 
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_mod_indigauge::{
-  EmptySessionMeta, FeedbackCategory, FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, IndigaugeMode,
-  IndigaugePlugin, StartSessionEvent, ig_info,
+  ig_info,
+  prelude::{
+    EmptySessionMeta, FeedbackCategory, FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, IndigaugeMode,
+    IndigaugePlugin, StartSessionEvent,
+  },
 };
 
 fn main() {

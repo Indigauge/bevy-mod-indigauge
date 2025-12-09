@@ -1,15 +1,25 @@
 use std::{env::consts::OS, time::Instant};
 
-use bevy::{diagnostic::SystemInfo, prelude::*, render::renderer::RenderAdapterInfo};
+use bevy::{diagnostic::SystemInfo, prelude::*, render::renderer::RenderAdapterInfo, state::state::FreelyMutableState};
 use bevy_mod_reqwest::{ReqwestErrorEvent, ReqwestResponseEvent};
 
 use crate::{
-  GLOBAL_TX, IndigaugeInitDoneEvent, IndigaugeLogLevel, SESSION_START_INSTANT, StartSessionEvent,
+  GLOBAL_TX, SESSION_START_INSTANT,
   api_types::{ApiResponse, StartSessionPayload, StartSessionResponse},
+  prelude::*,
   resources::{IndigaugeConfig, IndigaugeMode, session::SessionApiKey},
   sysparam::BevyIndigauge,
   utils::{bucket_cores, bucket_ram_gb, coarsen_cpu_name},
 };
+
+pub fn switch_state_after_session_init<S>(state: S) -> impl FnMut(Trigger<IndigaugeInitDoneEvent>, ResMut<NextState<S>>)
+where
+  S: FreelyMutableState + Copy,
+{
+  move |_trigger, mut next_state| {
+    next_state.set(state);
+  }
+}
 
 pub fn observe_start_session_event(
   event: Trigger<StartSessionEvent>,
@@ -121,7 +131,7 @@ pub fn on_start_session_error(
   log_level: Res<IndigaugeLogLevel>,
 ) {
   if *log_level <= IndigaugeLogLevel::Error {
-    error!(message = "Create session post request failed", error = ?trigger.event().0);
+    error!(message = "Create session post request failed", error = %trigger.event().0);
   }
   commands.trigger(IndigaugeInitDoneEvent::Failure("Create session post request failed".to_string()));
 }

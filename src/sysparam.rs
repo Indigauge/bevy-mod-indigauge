@@ -10,9 +10,9 @@ use serde::Serialize;
 use serde_json::json;
 
 use crate::api_types::{BatchEventPayload, FeedbackPayload};
+use crate::prelude::*;
 use crate::resources::events::BufferedEvents;
-use crate::resources::{IndigaugeConfig, IndigaugeMode};
-use crate::{IndigaugeLogLevel, LastSentRequestInstant};
+use crate::resources::{IndigaugeConfig, IndigaugeMode, LastSentRequestInstant};
 
 #[derive(SystemParam)]
 pub struct BevyIndigauge<'w, 's> {

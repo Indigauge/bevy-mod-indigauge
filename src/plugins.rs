@@ -62,10 +62,7 @@ where
   fn default() -> Self {
     Self {
       game_name: env!("CARGO_PKG_NAME").to_string(),
-      public_key: std::env::var("INDIGAUGE_PUBLIC_KEY").unwrap_or_else(|_| {
-        warn!("INDIGAUGE_PUBLIC_KEY environment variable not set");
-        "".to_string()
-      }),
+      public_key: std::env::var("INDIGAUGE_PUBLIC_KEY").unwrap_or_default(),
       game_version: env!("CARGO_PKG_VERSION").to_string(),
       log_level: IndigaugeLogLevel::Info,
       mode: IndigaugeMode::default(),
@@ -82,11 +79,18 @@ where
     let config = IndigaugeConfig::new(&self.game_name, &self.public_key, &self.game_version);
 
     if matches!(self.mode, IndigaugeMode::Live | IndigaugeMode::Dev) {
-      if config.public_key.is_empty() {
+      if config.public_key.is_empty() && self.mode == IndigaugeMode::Live {
         if self.log_level <= IndigaugeLogLevel::Warn {
-          warn!("Indigauge public key is not set");
+          warn!(
+            "Indigauge public key is not set for live-mode. Please set the INDIGAUGE_PUBLIC_KEY environment variable to start sessions and send events."
+          );
         }
       } else if GLOBAL_TX.get().is_none() {
+        if config.public_key.is_empty() && self.log_level <= IndigaugeLogLevel::Info {
+          info!(
+            "Indigauge public key is not set for dev-mode. Logs will still be shown in the console, but not sent to the server."
+          );
+        }
         let (tx, rx) = bounded::<QueuedEvent>(config.max_queue);
         GLOBAL_TX.set(tx).ok();
 

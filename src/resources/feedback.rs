@@ -11,6 +11,46 @@ impl Default for FeedbackKeyCodeToggle {
   }
 }
 
+#[derive(Default)]
+pub enum FeedbackSpawnPosition {
+  TopLeft,
+  TopRight,
+  TopCenter,
+  BottomLeft,
+  BottomRight,
+  BottomCenter,
+  #[default]
+  Center,
+  CenterLeft,
+  CenterRight,
+}
+
+impl FeedbackSpawnPosition {
+  pub fn align_items(&self) -> AlignItems {
+    match self {
+      FeedbackSpawnPosition::TopLeft | FeedbackSpawnPosition::TopCenter | FeedbackSpawnPosition::TopRight => {
+        AlignItems::Start
+      },
+      FeedbackSpawnPosition::BottomLeft | FeedbackSpawnPosition::BottomCenter | FeedbackSpawnPosition::BottomRight => {
+        AlignItems::End
+      },
+      _ => AlignItems::Center,
+    }
+  }
+
+  pub fn justify_content(&self) -> JustifyContent {
+    match self {
+      FeedbackSpawnPosition::TopLeft | FeedbackSpawnPosition::BottomLeft | FeedbackSpawnPosition::CenterLeft => {
+        JustifyContent::Start
+      },
+      FeedbackSpawnPosition::TopRight | FeedbackSpawnPosition::BottomRight | FeedbackSpawnPosition::CenterRight => {
+        JustifyContent::End
+      },
+      _ => JustifyContent::Center,
+    }
+  }
+}
+
 #[derive(Resource, Debug)]
 pub struct FeedbackPanelStyles {
   pub primary: Color,
@@ -101,7 +141,7 @@ impl Default for FeedbackPanelStyles {
 ///
 /// * [`FeedbackCategory`] – Defines available categories for feedback.
 ///
-#[derive(Resource, Default)]
+#[derive(Resource)]
 pub struct FeedbackPanelProps {
   /// Optional custom title shown at the top of the feedback form.
   pub(crate) title: Option<String>,
@@ -113,10 +153,30 @@ pub struct FeedbackPanelProps {
   pub(crate) category: Option<FeedbackCategory>,
 
   /// Whether the feedback panel is currently visible.
-  pub(crate) visible: bool,
+  pub visible: bool,
 
   /// Whether screenshots are allowed when submitting feedback.
   pub(crate) allow_screenshot: bool,
+
+  pub(crate) spawn_position: FeedbackSpawnPosition,
+
+  pub(crate) position_margin: UiRect,
+}
+
+impl Default for FeedbackPanelProps {
+  /// Creates a new feedback panel with "Send feedback" as title, no question and no category.
+  /// Screenshots are allowed by default.
+  fn default() -> Self {
+    Self {
+      title: Some("Send feedback".to_string()),
+      question: None,
+      category: None,
+      visible: true,
+      allow_screenshot: true,
+      spawn_position: FeedbackSpawnPosition::default(),
+      position_margin: UiRect::all(Val::Px(16.0)),
+    }
+  }
 }
 
 impl FeedbackPanelProps {
@@ -129,21 +189,11 @@ impl FeedbackPanelProps {
       category: Some(category),
       visible: true,
       allow_screenshot: false,
+      ..Default::default()
     }
   }
 
-  /// Creates a new feedback panel with "Send feedback" as title, no question and no category.
-  /// Screenshots are allowed by default.
-  pub fn visible() -> Self {
-    Self {
-      title: Some("Send feedback".to_string()),
-      question: None,
-      category: None,
-      visible: true,
-      allow_screenshot: true,
-    }
-  }
-
+  /// Set a custom title for the feedback panel
   pub fn title(mut self, title: impl Into<String>) -> Self {
     self.title = Some(title.into());
     self
@@ -151,6 +201,16 @@ impl FeedbackPanelProps {
 
   pub fn allow_screenshot(mut self, allow_screenshot: bool) -> Self {
     self.allow_screenshot = allow_screenshot;
+    self
+  }
+
+  pub fn spawn_position(mut self, spawn_position: FeedbackSpawnPosition) -> Self {
+    self.spawn_position = spawn_position;
+    self
+  }
+
+  pub fn margin(mut self, margin: UiRect) -> Self {
+    self.position_margin = margin;
     self
   }
 }

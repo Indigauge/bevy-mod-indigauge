@@ -9,8 +9,9 @@ use bevy_mod_reqwest::ReqwestResponseEvent;
 use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 
 use crate::{
-  FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, SESSION_START_INSTANT,
+  SESSION_START_INSTANT,
   api_types::{FeedbackPayload, IdResponse},
+  prelude::*,
   primitives::feedback::{CategoryButtonText, CategoryItem, FeedbackPanel, MessageInput, ScreenshotToggleText},
   resources::{
     feedback::{FeedbackFormState, TakeScreenshot},
