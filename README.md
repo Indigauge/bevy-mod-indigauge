@@ -12,6 +12,7 @@ It’s designed to be easy to integrate and is powerful enough for production us
 - Lightweight event macros: `ig_info!`, `ig_warn!`, `ig_error!`, …
 - Built-in **Feedback UI panel** for in-game bug reports & suggestions
 - Works on both **native** and **WASM** builds*
+- **Tracing support** — log events to the Indigauge API through tracing
 
 > [!WARNING]
 > On wasm builds, the panic handler is disabled. No crash reports will be sent as events to the Indigauge API.
@@ -38,7 +39,10 @@ cargo run --release --example minimal
 ```
 
 ```bash
-INDIGAUGE_PUBLIC_KEY=YOUR_PUBLIC_KEY cargo run --release --example breakout
+cargo run --release --example breakout
+
+# Or with tracing feature:
+cargo run --release --example breakout --features tracing
 ```
 
 ## Quick Start
@@ -49,12 +53,8 @@ INDIGAUGE_PUBLIC_KEY=YOUR_PUBLIC_KEY cargo run --release --example breakout
 
 ```rust
 use std::time::Duration;
-
 use bevy::{prelude::*, time::common_conditions::on_timer};
-use bevy_mod_indigauge::{
-  FeedbackCategory, FeedbackPanelProps, FeedbackPanelStyles, IndigaugeLogLevel, IndigaugeMode, IndigaugePlugin,
-  StartSessionEvent, ig_info,
-};
+use bevy_mod_indigauge::prelude::{*, ig_info};
 
 fn main() {
   App::new()
@@ -93,7 +93,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
   commands.spawn((Camera2d, IsDefaultUiCamera));
-  commands.trigger(StartSessionEvent::new().with_locale("en-US").with_platform("steam"));
+  commands.trigger(StartSessionEvent::new());
 }
 
 fn trigger_feedback_with_question(
@@ -123,8 +123,65 @@ ig_info!("player.jump", { "height": 2.4 });
 ig_error!("physics.failed", { "component": "rigid_body" });
 ```
 
+## Tracing support
+
+Send events to the Indigauge API through tracing. This is useful for debugging and monitoring your game.
+
+### Enable the tracing feature
+
+```toml
+[dependencies]
+bevy = { version = "0.15", features = ["bevy_mod_indigauge"] }
+bevy-mod-indigauge = { version = "0.2", features = ["tracing"] }
+```
+
+```rust
+use bevy::{log::{LogPlugin, BoxedLayer}, prelude::*};
+use bevy_mod_indigauge::{prelude::*, tracing::IndigaugeLayer};
+
+/// Default tracing layer, will send all events to the Indigauge API.
+pub fn default_indigauge_layer(_app: &mut App) -> Option<BoxedLayer> {
+  Some(Box::new(IndigaugeLayer::default()))
+}
+
+/// Custom tracing layer, will only send events that has an event_type, is either info, warn, or 
+/// error and is not from the bevy_mod_othercrate module to the Indigauge API.
+pub fn custom_indigauge_layer(_app: &mut App) -> Option<BoxedLayer> {
+  Some(Box::new(
+    IndigaugeLayer::default()
+      .with_event_type_required(true) 
+      .with_filters(vec!["bevy_mod_othercrate"])
+      .with_levels(vec![
+        IndigaugeLogLevel::Info,
+        IndigaugeLogLevel::Warn,
+        IndigaugeLogLevel::Error,
+      ]),
+  ))
+}
+
+fn main() {
+  App::new()
+    .add_plugins(DefaultPlugins.set(LogPlugin {custom_layer: indigauge_layer, ..default()}))
+    .add_plugin(IndigaugePlugin::new("YOUR_PUBLIC_KEY", None, None))
+    .add_systems(Startup, setup)
+    .add_systems(Update, (track_counter.run_if(on_timer(Duration::from_secs(2)))))
+    .run();
+}
+
+fn setup(mut commands: Commands) {
+  commands.spawn((Camera2d, IsDefaultUiCamera));
+  commands.trigger(StartSessionEvent::new());
+}
+
+fn track_counter(mut counter: Local<u32>) {
+  *counter += 1;
+  info!(ig = "counter.increase", value = *counter);
+}
+```
+
 ## Bevy Compatibility
 
 | bevy   | bevy-mod-indigauge |
 | ------ | ---------------- |
+| 0.15   | 0.2             |
 | 0.15   | 0.1             |
