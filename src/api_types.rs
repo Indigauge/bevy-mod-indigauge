@@ -60,7 +60,7 @@ pub struct BatchEventPayload {
   pub events: Vec<EventPayload>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EventPayload {
   /// The type of the event. Event type must be in the format 'namespace.type'
@@ -76,7 +76,7 @@ pub struct EventPayload {
   pub context: Option<EventPayloadCtx>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct EventPayloadCtx {
   pub file: String,
   pub line: u32,

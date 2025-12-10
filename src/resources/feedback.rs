@@ -92,7 +92,7 @@ impl Default for FeedbackPanelStyles {
 /// feedback panel.
 ///
 /// This resource is inserted into the [`World`](bevy::prelude::World) when you
-/// want to show the feedback form manually. The [`IndigaugePlugin`] listens
+/// want to show the feedback form manually. The [`IndigaugePlugin`](crate::prelude::IndigaugePlugin) listens
 /// for it and renders a user interface that allows players to submit feedback
 /// directly from within the game.
 ///

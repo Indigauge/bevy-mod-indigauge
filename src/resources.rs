@@ -57,11 +57,43 @@ impl LastSentRequestInstant {
 
 #[derive(Resource, PartialEq, PartialOrd, Clone)]
 pub enum IndigaugeLogLevel {
+  #[cfg(feature = "tracing")]
+  Trace,
   Debug,
   Info,
   Warn,
   Error,
   Silent,
+}
+
+#[cfg(feature = "tracing")]
+impl IndigaugeLogLevel {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      IndigaugeLogLevel::Trace => "trace",
+      IndigaugeLogLevel::Debug => "debug",
+      IndigaugeLogLevel::Info => "info",
+      IndigaugeLogLevel::Warn => "warn",
+      IndigaugeLogLevel::Error => "error",
+      IndigaugeLogLevel::Silent => "silent",
+    }
+  }
+}
+
+#[cfg(feature = "tracing")]
+use bevy::utils::tracing::Level;
+
+#[cfg(feature = "tracing")]
+impl From<&Level> for IndigaugeLogLevel {
+  fn from(level: &Level) -> Self {
+    match *level {
+      Level::ERROR => IndigaugeLogLevel::Error,
+      Level::WARN => IndigaugeLogLevel::Warn,
+      Level::INFO => IndigaugeLogLevel::Info,
+      Level::DEBUG => IndigaugeLogLevel::Debug,
+      Level::TRACE => IndigaugeLogLevel::Trace,
+    }
+  }
 }
 
 #[derive(Resource, PartialEq, Default, Clone)]

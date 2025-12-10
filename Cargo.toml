@@ -19,6 +19,7 @@ all-features = true
 [features]
 default = ["panic_handler"]
 panic_handler = ["dep:reqwest"]
+tracing = ["dep:tracing-subscriber"]
 
 [dependencies]
 bevy = { version = "0.15", default-features = false, features = [
@@ -40,12 +41,14 @@ bevy_mod_reqwest = { version = "0.18" }
 dirs = "6.0"
 uuid = { version = "1", features = ["serde", "v4"] }
 reqwest = { version = "0.12", features = ["json", "blocking"], optional = true }
+tracing-subscriber = { version = "0.3", features = ["registry"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 bevy = { version = "0.15" }
+tracing = { version = "0.1" }
 
 [[example]]
 name = "minimal"
