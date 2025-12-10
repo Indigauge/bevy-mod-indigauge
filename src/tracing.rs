@@ -283,16 +283,18 @@ mod tests {
     tracing::error!("Test default error event type");
     tracing::info!(message = "Test set event type", event_type = "custom.event");
     tracing::info!(message = "Test set ig", ig = "custom.event");
+    tracing::info!(ig = "custom.event");
 
     let events = sink.take_events();
-    assert_eq!(events.len(), 5);
+    assert_eq!(events.len(), 6);
 
-    let expected = vec![
+    let expected = [
       ("info", "tracing.info", "Test default info event type", false),
       ("warn", "tracing.warn", "Test default warn event type", true),
       ("error", "tracing.error", "Test default error event type", true),
       ("info", "custom.event", "Test set event type", false),
       ("info", "custom.event", "Test set ig", false),
+      ("info", "custom.event", "", false),
     ];
 
     events
@@ -301,12 +303,15 @@ mod tests {
       .for_each(|(event, (level, t, message, has_context))| {
         assert_eq!(event.level, *level);
         assert_eq!(event.event_type, t.to_string());
-        assert_eq!(
-          event.metadata,
-          Some(json!({
-            "message": message
-          }))
-        );
+
+        if !message.is_empty() {
+          assert_eq!(
+            event.metadata,
+            Some(json!({
+              "message": message
+            }))
+          );
+        }
 
         if *has_context {
           let ctx = event.context.clone().expect("Context");
