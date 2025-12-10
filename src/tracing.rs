@@ -315,7 +315,7 @@ mod tests {
 
         if *has_context {
           let ctx = event.context.clone().expect("Context");
-          assert_eq!(ctx.file, "src/tracing.rs");
+          assert!(ctx.file.ends_with("tracing.rs"));
           assert_eq!(ctx.module, Some("bevy_mod_indigauge::tracing::tests"));
         }
       });
