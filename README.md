@@ -161,7 +161,7 @@ pub fn custom_indigauge_layer(_app: &mut App) -> Option<BoxedLayer> {
 
 fn main() {
   App::new()
-    .add_plugins(DefaultPlugins.set(LogPlugin {custom_layer: indigauge_layer, ..default()}))
+    .add_plugins(DefaultPlugins.set(LogPlugin {custom_layer: custom_indigauge_layer, ..default()}))
     .add_plugin(IndigaugePlugin::new("YOUR_PUBLIC_KEY", None, None))
     .add_systems(Startup, setup)
     .add_systems(Update, (track_counter.run_if(on_timer(Duration::from_secs(2)))))
