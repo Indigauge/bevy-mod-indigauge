@@ -1,9 +1,3 @@
-use crate::{
-  SESSION_START_INSTANT,
-  api_types::{EventPayload, EventPayloadCtx},
-};
-use std::time::Instant;
-
 pub(crate) fn bucket_cores(n: u32) -> &'static str {
   match n {
     0..=2 => "1-2",
@@ -163,7 +157,12 @@ pub fn panic_handler(
   host_origin: String,
   session_api_key: String,
 ) -> impl Fn(&std::panic::PanicHookInfo) + Send + Sync + 'static {
+  use crate::{
+    SESSION_START_INSTANT,
+    api_types::{EventPayload, EventPayloadCtx},
+  };
   use serde_json::json;
+  use std::time::Instant;
 
   move |info| {
     if let Some(start_instant) = SESSION_START_INSTANT.get() {
