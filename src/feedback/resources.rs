@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::primitives::feedback::FeedbackCategory;
+use crate::feedback::types::{FeedbackCategory, FeedbackSpawnPosition};
 
 #[derive(Resource, Debug)]
 pub struct FeedbackKeyCodeToggle(pub KeyCode);
@@ -8,46 +8,6 @@ pub struct FeedbackKeyCodeToggle(pub KeyCode);
 impl Default for FeedbackKeyCodeToggle {
   fn default() -> Self {
     Self(KeyCode::F2)
-  }
-}
-
-#[derive(Default)]
-pub enum FeedbackSpawnPosition {
-  TopLeft,
-  TopRight,
-  TopCenter,
-  BottomLeft,
-  BottomRight,
-  BottomCenter,
-  #[default]
-  Center,
-  CenterLeft,
-  CenterRight,
-}
-
-impl FeedbackSpawnPosition {
-  pub fn align_items(&self) -> AlignItems {
-    match self {
-      FeedbackSpawnPosition::TopLeft | FeedbackSpawnPosition::TopCenter | FeedbackSpawnPosition::TopRight => {
-        AlignItems::Start
-      },
-      FeedbackSpawnPosition::BottomLeft | FeedbackSpawnPosition::BottomCenter | FeedbackSpawnPosition::BottomRight => {
-        AlignItems::End
-      },
-      _ => AlignItems::Center,
-    }
-  }
-
-  pub fn justify_content(&self) -> JustifyContent {
-    match self {
-      FeedbackSpawnPosition::TopLeft | FeedbackSpawnPosition::BottomLeft | FeedbackSpawnPosition::CenterLeft => {
-        JustifyContent::Start
-      },
-      FeedbackSpawnPosition::TopRight | FeedbackSpawnPosition::BottomRight | FeedbackSpawnPosition::CenterRight => {
-        JustifyContent::End
-      },
-      _ => JustifyContent::Center,
-    }
   }
 }
 

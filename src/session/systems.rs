@@ -4,8 +4,8 @@ use serde_json::json;
 
 use crate::{
   prelude::StartSessionEvent,
-  resources::session::{SessionApiKey, SessionMeta},
-  sysparam::BevyIndigauge,
+  session::resources::{SessionApiKey, SessionMeta},
+  utils::BevyIndigauge,
 };
 
 pub fn handle_exit_event<E>(exit_events: EventReader<E>, ig: BevyIndigauge, session_key: Res<SessionApiKey>)

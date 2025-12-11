@@ -2,22 +2,21 @@ use std::marker::PhantomData;
 
 use bevy::prelude::*;
 use bevy_mod_reqwest::ReqwestPlugin;
-use crossbeam_channel::bounded;
+use crossbeam_channel::{Sender, bounded};
+use once_cell::sync::OnceCell;
 use serde::Serialize;
 
 use crate::{
-  GLOBAL_TX,
-  plugins::{events::EventsPlugin, feedback::FeedbackUiPlugin, session::SessionPlugin},
-  resources::{
-    IndigaugeConfig, IndigaugeLogLevel, IndigaugeMode, LastSentRequestInstant,
-    events::{BufferedEvents, EventQueueReceiver, QueuedEvent},
-    session::EmptySessionMeta,
+  config::*,
+  event::{
+    EventsPlugin,
+    resources::{BufferedEvents, EventQueueReceiver, QueuedEvent},
   },
+  feedback::FeedbackUiPlugin,
+  session::{SessionPlugin, resources::EmptySessionMeta},
 };
 
-mod events;
-mod feedback;
-mod session;
+pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
 
 pub struct IndigaugePlugin<Meta = EmptySessionMeta> {
   public_key: String,
@@ -107,7 +106,6 @@ where
       ))
       .insert_resource(self.log_level.clone())
       .insert_resource(BufferedEvents::default())
-      .insert_resource(LastSentRequestInstant::new())
       .insert_resource(self.mode.clone())
       .insert_resource(config);
   }

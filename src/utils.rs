@@ -1,302 +1,280 @@
-use crate::{
-  GLOBAL_TX, SESSION_START_INSTANT,
-  api_types::{EventPayload, EventPayloadCtx},
-  resources::events::QueuedEvent,
-};
-use std::time::Instant;
+
+use bevy::ecs::bundle::Bundle;
+use bevy::ecs::observer::Trigger;
+use bevy::ecs::system::{IntoObserverSystem, Res, ResMut, SystemParam};
+use bevy::log::{error, info};
+use bevy_mod_reqwest::reqwest::{Error as ReqwestError, Request};
+use bevy_mod_reqwest::{BevyReqwest, ReqwestErrorEvent, ReqwestResponseEvent};
+use serde::Serialize;
+use serde_json::json;
+
+use crate::api_types::{BatchEventPayload, FeedbackPayload};
+use crate::config::*;
+use crate::event::resources::BufferedEvents;
 
 pub fn select<T>(true_case: T, false_case: T, condition: bool) -> T {
   if condition { true_case } else { false_case }
 }
 
-pub(crate) fn bucket_cores(n: u32) -> &'static str {
-  match n {
-    0..=2 => "1-2",
-    3..=4 => "3-4",
-    5..=8 => "6-8",
-    _ => ">8",
-  }
+#[derive(SystemParam)]
+pub struct BevyIndigauge<'w, 's> {
+  pub reqwest_client: BevyReqwest<'w, 's>,
+  pub config: Res<'w, IndigaugeConfig>,
+  pub buffered_events: ResMut<'w, BufferedEvents>,
+  pub log_level: Res<'w, IndigaugeLogLevel>,
+  pub mode: Res<'w, IndigaugeMode>,
 }
 
-pub(crate) fn bucket_ram_gb(gb: u32) -> &'static str {
-  match gb {
-    0..=4 => "<=4",
-    5..=8 => "6-8",
-    9..=16 => "12-16",
-    _ => ">16",
-  }
-}
-
-/// Coarsens a CPU model string (e.g. from Bevy’s `SystemInfo`) into a privacy-safe, general category.
-/// Intended for analytics and diagnostics, *not* fingerprinting.
-///
-/// Examples:
-/// - "11th Gen Intel(R) Core(TM) i7-11850H @ 2.50GHz" → "Intel i7 11th Gen"
-/// - "AMD Ryzen 7 5800X3D 8-Core Processor"           → "AMD Ryzen 7 5000 Series"
-/// - "Apple M2 Pro"                                   → "Apple M2"
-/// - "Intel(R) Xeon(R) CPU E5-2678 v3"                → "Intel Xeon"
-pub(crate) fn coarsen_cpu_name(cpu_raw: &str) -> Option<String> {
-  let name = cpu_raw.to_ascii_lowercase();
-
-  // Apple Silicon
-  if name.contains("apple m1") {
-    return Some("Apple M1".into());
-  } else if name.contains("apple m2") {
-    return Some("Apple M2".into());
-  } else if name.contains("apple m3") {
-    return Some("Apple M3".into());
-  }
-
-  // Intel families
-  if name.contains("intel") {
-    if name.contains("celeron") {
-      return Some("Intel Celeron".into());
-    }
-    if name.contains("pentium") {
-      return Some("Intel Pentium".into());
-    }
-    if name.contains("xeon") {
-      return Some("Intel Xeon".into());
-    }
-    if name.contains("atom") {
-      return Some("Intel Atom".into());
-    }
-    if name.contains("core") {
-      if name.contains("i3") {
-        return Some(if let Some(generation) = extract_generation(&name) {
-          format!("Intel i3 {}th Gen", generation)
-        } else {
-          "Intel i3".into()
-        });
-      } else if name.contains("i5") {
-        return Some(if let Some(generation) = extract_generation(&name) {
-          format!("Intel i5 {}th Gen", generation)
-        } else {
-          "Intel i5".into()
-        });
-      } else if name.contains("i7") {
-        return Some(if let Some(generation) = extract_generation(&name) {
-          format!("Intel i7 {}th Gen", generation)
-        } else {
-          "Intel i7".into()
-        });
-      } else if name.contains("i9") {
-        return Some(if let Some(generation) = extract_generation(&name) {
-          format!("Intel i9 {}th Gen", generation)
-        } else {
-          "Intel i9".into()
-        });
-      } else {
-        return Some("Intel Core (Other)".into());
-      }
-    }
-    // fallback for Intel
-    return Some("Intel (Other)".into());
-  }
-
-  // AMD families
-  if name.contains("amd") {
-    if name.contains("ryzen") {
-      if name.contains("threadripper") {
-        return Some("AMD Ryzen Threadripper".into());
-      }
-      // detect generation (e.g., 7000, 5000, 3000)
-      if let Some(generation) = extract_ryzen_gen(&name) {
-        return Some(format!("AMD Ryzen {} Series", generation));
-      }
-      return Some("AMD Ryzen".into());
-    }
-    if name.contains("epyc") {
-      return Some("AMD EPYC".into());
-    }
-    if name.contains("athlon") {
-      return Some("AMD Athlon".into());
-    }
-    // fallback for AMD
-    return Some("AMD (Other)".into());
-  }
-
-  // ARM (non-Apple)
-  if name.contains("arm") || name.contains("cortex") {
-    return Some("ARM (Generic)".into());
-  }
-
-  None
-}
-
-/// Extracts Intel generation number from a lowercase CPU string like "11th gen intel core i7-11800h".
-fn extract_generation(name: &str) -> Option<u8> {
-  // "11th gen" → 11
-  if let Some(pos) = name.find("th gen") {
-    // find preceding number
-    let before = &name[..pos];
-    let digits: String = before.chars().rev().take_while(|c| c.is_ascii_digit()).collect();
-    if !digits.is_empty() {
-      return digits.chars().rev().collect::<String>().parse().ok();
-    }
-  }
-  // fallback: try parse from model number (e.g. "i7-11800h" → 11)
-  if let Some(pos) = name.find("i7-")
-    && name.len() > pos + 3
-    && let Some(d) = name[pos + 3..].chars().next()
+impl<'w, 's> BevyIndigauge<'w, 's> {
+  pub(crate) fn build_post_request<S>(&self, url: &str, ig_key: &str, payload: &S) -> Result<Request, ReqwestError>
+  where
+    S: Serialize,
   {
-    return d.to_digit(10).map(|v| v as u8);
-  }
-  None
-}
+    let url = format!("{}/v1/{}", &self.config.api_base, url);
 
-/// Extracts Ryzen generation (3/5/7/9/5000 etc.)
-fn extract_ryzen_gen(name: &str) -> Option<String> {
-  // Match e.g. "ryzen 7 5800x" → "5000"
-  let parts: Vec<&str> = name.split_whitespace().collect();
-  for (i, part) in parts.iter().enumerate() {
-    if *part == "ryzen" && i + 2 < parts.len() {
-      let next = parts[i + 2];
-      // First digit of model number gives series (5 → 5000)
-      if let Some(first_digit) = next.chars().next()
-        && first_digit.is_ascii_digit()
-      {
-        return Some(format!("{}000", first_digit));
-      }
-    }
-  }
-  None
-}
-
-pub const fn validate_event_type(s: &str) -> Result<(), &'static str> {
-  let bytes = s.as_bytes();
-  let len = bytes.len();
-
-  if len < 3 {
-    return Err("Invalid event type: too short (expected 'a.b')");
+    self
+      .reqwest_client
+      .post(url)
+      .timeout(self.config.request_timeout)
+      .header("Content-Type", "application/json")
+      .header("X-Indigauge-Key", ig_key)
+      .json(payload)
+      .build()
   }
 
-  let mut dot_index: Option<usize> = None;
-  let mut i = 0;
+  pub(crate) fn build_patch_request<S>(&self, url: &str, ig_key: &str, payload: &S) -> Result<Request, ReqwestError>
+  where
+    S: Serialize,
+  {
+    let url = format!("{}/v1/{}", &self.config.api_base, url);
 
-  while i < len {
-    let b = bytes[i];
-    match b {
-      b'a'..=b'z' | b'A'..=b'Z' => {},
-      b'.' => {
-        if dot_index.is_some() {
-          return Err("Invalid event type: multiple '.' found");
+    self
+      .reqwest_client
+      .patch(url)
+      .timeout(self.config.request_timeout)
+      .header("Content-Type", "application/json")
+      .header("X-Indigauge-Key", ig_key)
+      .json(payload)
+      .build()
+  }
+
+  pub(crate) fn send_feedback_screenshot(&mut self, api_key: &str, feedback_id: &str, image_data: Vec<u8>) {
+    match *self.mode {
+      IndigaugeMode::Live => {
+        let url = format!("feedback/{}/screenshot", feedback_id);
+        let url = format!("{}/v1/{}", &self.config.api_base, url);
+
+        let request = self
+          .reqwest_client
+          .post(url)
+          .timeout(self.config.request_timeout)
+          .header("Content-Type", "image/png")
+          .header("X-Indigauge-Key", api_key)
+          .body(image_data)
+          .build();
+
+        if let Ok(request) = request {
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if trigger.status().is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Sent feedback screenshot");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send feedback screenshot");
+              }
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send feedback", error = ?trigger.event().0);
+              }
+            });
         }
-        dot_index = Some(i);
       },
-      _ => return Err("Invalid event type: only letters and a single '.' are allowed"),
-    }
-    i += 1;
-  }
-
-  let dot_pos = match dot_index {
-    Some(p) => p,
-    None => return Err("Invalid event type: must contain one '.'"),
-  };
-
-  if dot_pos == 0 || dot_pos == len - 1 {
-    return Err("Invalid event type: '.' cannot be the first or last character");
-  }
-
-  Ok(())
-}
-
-/// Panics at compile time if the event type does not contain exactly one dot.
-pub const fn validate_event_type_compile_time(s: &str) -> &str {
-  if let Err(err) = validate_event_type(s) {
-    panic!("{}", err);
-  }
-  s
-}
-
-#[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
-pub fn panic_handler(
-  host_origin: String,
-  session_api_key: String,
-) -> impl Fn(&std::panic::PanicHookInfo) + Send + Sync + 'static {
-  use serde_json::json;
-
-  move |info| {
-    if let Some(start_instant) = SESSION_START_INSTANT.get() {
-      use crate::api_types::StartSessionResponse;
-      if session_api_key == StartSessionResponse::dev().session_token {
-        return;
-      }
-
-      let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
-
-      let metadata = info
-        .payload()
-        .downcast_ref::<&str>()
-        .map(|s| json!({"message": s.to_string()}));
-
-      let context = info.location().map(|loc| EventPayloadCtx {
-        file: loc.file().to_string(),
-        line: loc.line(),
-        module: None,
-      });
-      let payload = EventPayload {
-        level: "fatal",
-        event_type: "game.crash".to_string(),
-        elapsed_ms,
-        metadata,
-        idempotency_key: None,
-        context,
-      };
-
-      let single_event_endpoint = format!("{}/v1/events", host_origin);
-      let client = reqwest::blocking::Client::new();
-      let _ = client
-        .post(&single_event_endpoint)
-        .header("X-Indigauge-Key", &session_api_key)
-        .json(&payload)
-        .send();
-
-      let end_session_endpoint = format!("{}/v1/sessions/end", host_origin);
-      let _ = client
-        .post(&end_session_endpoint)
-        .header("X-Indigauge-Key", &session_api_key)
-        .json(&json!({"reason": "crashed"}))
-        .send();
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: Sent feedback screenshot");
+        }
+      },
+      _ => {},
     }
   }
-}
 
-#[inline]
-pub fn enqueue(
-  level: &'static str,
-  event_type: &str,
-  metadata: Option<serde_json::Value>,
-  file: &'static str,
-  line: u32,
-  module: &'static str,
-) -> bool {
-  let tx = match GLOBAL_TX.get() {
-    Some(tx) => tx.clone(),
-    None => return false,
-  };
+  pub(crate) fn send_feedback<RB, RM, OR>(&mut self, api_key: &str, payload: &FeedbackPayload, on_response: OR)
+  where
+    RB: Bundle,
+    OR: IntoObserverSystem<ReqwestResponseEvent, RB, RM>,
+  {
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_post_request("feedback", api_key, payload) {
+          self.reqwest_client.send(request).on_response(on_response).on_error(
+            |trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send feedback", error = ?trigger.event().0);
+              }
+            },
+          );
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: Sent feedback", feedback = ?payload);
+        }
+      },
+      _ => {},
+    }
+  }
 
-  if let Some(start_instant) = SESSION_START_INSTANT.get() {
-    let elapsed_ms = Instant::now().duration_since(*start_instant).as_millis();
-    let module = if module.is_empty() { None } else { Some(module) };
+  pub(crate) fn flush_events(&mut self, api_key: &str) -> usize {
+    let event_len = self.buffered_events.events.len();
+    if event_len == 0 {
+      return 0;
+    }
 
-    let context = matches!(level, "warn" | "error").then(|| EventPayloadCtx {
-      file: file.to_string(),
-      line,
-      module,
-    });
-
-    let payload = EventPayload {
-      level,
-      event_type: event_type.to_string(),
-      elapsed_ms,
-      metadata,
-      idempotency_key: None,
-      context,
+    let events = BatchEventPayload {
+      events: self
+        .buffered_events
+        .events
+        .drain(..(event_len.min(self.config.batch_size)))
+        .map(|event| event.into_inner())
+        .collect::<Vec<_>>(),
     };
 
-    tx.try_send(QueuedEvent::new(payload)).is_ok()
-  } else {
-    false
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_post_request("events/batch", api_key, &events) {
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Event batch sent successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send event batch", ?status);
+              }
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send event batch", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: sending event batch", count = events.events.len());
+        }
+      },
+      _ => {},
+    }
+
+    events.events.len()
+  }
+
+  pub(crate) fn send_heartbeat(&mut self, api_key: &str) {
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_post_request("sessions/heartbeat", api_key, &json!({})) {
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Heartbeat sent successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to update heartbeat", ?status);
+              }
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send session heartbeat", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!("DEVMODE: heartbeat");
+        }
+      },
+      _ => {},
+    }
+  }
+
+  pub(crate) fn update_metadata<T>(&mut self, meta: &T, api_key: &str)
+  where
+    T: Serialize,
+  {
+    let metadata = match serde_json::to_value(meta) {
+      Ok(json) => json,
+      Err(error) => {
+        if *self.log_level <= IndigaugeLogLevel::Error {
+          error!(message = "Failed to serialize metadata", ?error);
+        }
+        return;
+      },
+    };
+
+    match *self.mode {
+      IndigaugeMode::Live => {
+        if let Ok(request) = self.build_patch_request("sessions", api_key, &metadata) {
+          self
+            .reqwest_client
+            .send(request)
+            .on_response(|trigger: Trigger<ReqwestResponseEvent>, log_level: Res<IndigaugeLogLevel>| {
+              let status = trigger.event().status();
+              if status.is_success() {
+                if *log_level <= IndigaugeLogLevel::Info {
+                  info!(message = "Metadata updated successfully");
+                }
+              } else if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to update metadata", ?status);
+              }
+            })
+            .on_error(|trigger: Trigger<ReqwestErrorEvent>, log_level: Res<IndigaugeLogLevel>| {
+              if *log_level <= IndigaugeLogLevel::Error {
+                error!(message = "Failed to send session metadata update", error = ?trigger.event().0);
+              }
+            });
+        }
+      },
+      IndigaugeMode::Dev => {
+        if *self.log_level <= IndigaugeLogLevel::Info {
+          info!(message = "DEVMODE: update metadata", ?metadata);
+        }
+      },
+      _ => {},
+    }
+  }
+
+  #[cfg(not(target_family = "wasm"))]
+  pub(crate) fn get_or_init_player_id(&self) -> String {
+    use std::fs;
+    use uuid::Uuid;
+    let game_folder_path = dirs::preference_dir().map(|dir| dir.join(&self.config.game_name));
+
+    if let Some(game_folder_path) = game_folder_path {
+      let player_id_file_path = game_folder_path.join("player_id.txt");
+
+      if let Ok(player_id) = fs::read_to_string(&player_id_file_path) {
+        player_id
+      } else {
+        let new_player_id = Uuid::new_v4().to_string();
+        let _ = fs::create_dir_all(&game_folder_path);
+        let _ = fs::write(&player_id_file_path, &new_player_id);
+        new_player_id
+      }
+    } else {
+      Uuid::new_v4().to_string()
+    }
   }
 }

@@ -1,5 +1,13 @@
 use bevy::prelude::*;
 
+#[derive(Event, Debug)]
+pub enum IndigaugeInitDoneEvent {
+  Success,
+  Skipped(String),
+  Failure(String),
+  UnexpectedFailure(String),
+}
+
 #[derive(Event, Default, Clone)]
 pub struct StartSessionEvent {
   pub platform: Option<String>,

@@ -24,7 +24,7 @@ It’s designed to be easy to integrate and is powerful enough for production us
 ```toml
 [dependencies]
 bevy = "0.15"
-bevy-mod-indigauge = { version = "0.1.0" }
+bevy-mod-indigauge = { version = "0.2" }
 ```
 
 ## Examples

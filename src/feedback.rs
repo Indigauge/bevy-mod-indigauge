@@ -1,13 +1,17 @@
-// feedback_ui.rs
 use bevy::prelude::*;
 use bevy_text_edit::TextEditPluginNoState;
 
-use crate::{
-  resources::{feedback::*, session::SessionApiKey},
-  systems::feedback::*,
-};
+use crate::{feedback::resources::*, feedback::systems::*, session::resources::SessionApiKey};
+
+pub mod components;
+pub mod helpers;
+pub(crate) mod observers;
+pub mod resources;
+mod systems;
+pub mod types;
 
 pub struct FeedbackUiPlugin;
+
 impl Plugin for FeedbackUiPlugin {
   fn build(&self, app: &mut App) {
     app
