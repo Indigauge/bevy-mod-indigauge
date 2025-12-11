@@ -158,8 +158,8 @@ pub fn panic_handler(
   session_api_key: String,
 ) -> impl Fn(&std::panic::PanicHookInfo) + Send + Sync + 'static {
   use crate::{
-    SESSION_START_INSTANT,
     api_types::{EventPayload, EventPayloadCtx},
+    session::SESSION_START_INSTANT,
   };
   use serde_json::json;
   use std::time::Instant;

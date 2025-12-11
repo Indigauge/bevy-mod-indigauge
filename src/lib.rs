@@ -1,8 +1,5 @@
-use once_cell::sync::OnceCell;
-use std::time::Instant;
-
 mod api_types;
-pub mod utils;
+pub(crate) mod utils;
 
 pub(crate) mod config;
 pub(crate) mod event;
@@ -12,8 +9,6 @@ pub(crate) mod session;
 
 #[cfg(feature = "tracing")]
 pub mod tracing;
-
-pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
 
 pub mod prelude {
   pub use crate::config::{IndigaugeLogLevel, IndigaugeMode};

@@ -1,10 +1,10 @@
 use std::time::Instant;
 
 use crate::{
-  SESSION_START_INSTANT,
   api_types::{EventPayload, EventPayloadCtx},
   event::resources::QueuedEvent,
   plugin::GLOBAL_TX,
+  session::SESSION_START_INSTANT,
 };
 
 #[inline]

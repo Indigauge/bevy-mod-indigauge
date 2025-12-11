@@ -4,12 +4,12 @@ use bevy::{diagnostic::SystemInfo, prelude::*, render::renderer::RenderAdapterIn
 use bevy_mod_reqwest::{ReqwestErrorEvent, ReqwestResponseEvent};
 
 use crate::{
-  SESSION_START_INSTANT,
   api_types::{ApiResponse, StartSessionPayload, StartSessionResponse},
   config::IndigaugeConfig,
   config::IndigaugeMode,
   plugin::GLOBAL_TX,
   prelude::*,
+  session::SESSION_START_INSTANT,
   session::resources::SessionApiKey,
   session::utils::{bucket_cores, bucket_ram_gb, coarsen_cpu_name},
   utils::BevyIndigauge,
