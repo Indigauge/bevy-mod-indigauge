@@ -1,5 +1,5 @@
+use crate::event::utils::{enqueue, validate_event_type};
 use crate::prelude::IndigaugeLogLevel;
-use crate::utils::{enqueue, validate_event_type};
 use bevy::utils::tracing::{Event, Subscriber, field::Field};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;

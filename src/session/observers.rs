@@ -4,12 +4,15 @@ use bevy::{diagnostic::SystemInfo, prelude::*, render::renderer::RenderAdapterIn
 use bevy_mod_reqwest::{ReqwestErrorEvent, ReqwestResponseEvent};
 
 use crate::{
-  GLOBAL_TX, SESSION_START_INSTANT,
+  SESSION_START_INSTANT,
   api_types::{ApiResponse, StartSessionPayload, StartSessionResponse},
+  config::IndigaugeConfig,
+  config::IndigaugeMode,
+  plugin::GLOBAL_TX,
   prelude::*,
-  resources::{IndigaugeConfig, IndigaugeMode, session::SessionApiKey},
-  sysparam::BevyIndigauge,
-  utils::{bucket_cores, bucket_ram_gb, coarsen_cpu_name},
+  session::resources::SessionApiKey,
+  session::utils::{bucket_cores, bucket_ram_gb, coarsen_cpu_name},
+  utils::BevyIndigauge,
 };
 
 pub fn switch_state_after_session_init<S>(state: S) -> impl FnMut(Trigger<IndigaugeInitDoneEvent>, ResMut<NextState<S>>)
@@ -169,7 +172,7 @@ fn start_session(
 
   #[cfg(all(feature = "panic_handler", not(target_family = "wasm")))]
   {
-    use crate::utils::panic_handler;
+    use crate::session::utils::panic_handler;
 
     let host_origin = config.api_base.clone();
     std::panic::set_hook(Box::new(panic_handler(host_origin, key.clone())));

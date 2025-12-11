@@ -1,13 +1,6 @@
-use std::{
-  env,
-  time::{Duration, Instant},
-};
+use std::{env, time::Duration};
 
-use bevy::ecs::system::Resource;
-
-pub mod events;
-pub mod feedback;
-pub mod session;
+use bevy::prelude::*;
 
 #[derive(Resource, Clone)]
 pub struct IndigaugeConfig {
@@ -32,25 +25,6 @@ impl IndigaugeConfig {
       flush_interval: Duration::from_secs(10),
       max_queue: 10_000,
       request_timeout: Duration::from_secs(10),
-    }
-  }
-}
-
-#[derive(Resource)]
-pub struct LastSentRequestInstant {
-  pub(crate) instant: Instant,
-}
-
-impl Default for LastSentRequestInstant {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl LastSentRequestInstant {
-  pub fn new() -> Self {
-    Self {
-      instant: Instant::now(),
     }
   }
 }

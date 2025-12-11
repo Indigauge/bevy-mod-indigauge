@@ -6,12 +6,11 @@ use bevy::{
 use bevy_text_edit::TextEditable;
 
 use crate::{
-  observers::feedback::{
+  feedback::observers::{
     observe_cancel_click, observe_category_dropdown_click, observe_category_item_click,
     observe_screenshot_toggle_click, observe_submit_click,
   },
-  primitives::feedback::*,
-  resources::feedback::*,
+  feedback::{components::*, helpers::*, resources::*, types::FeedbackCategory},
   utils::select,
 };
 

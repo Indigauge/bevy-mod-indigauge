@@ -1,12 +1,10 @@
 use bevy::prelude::*;
 
 use crate::{
-  resources::{
-    IndigaugeLogLevel,
-    events::{BufferedEvents, EventQueueReceiver},
-    session::SessionApiKey,
-  },
-  sysparam::BevyIndigauge,
+  config::IndigaugeLogLevel,
+  event::resources::{BufferedEvents, EventQueueReceiver},
+  session::resources::SessionApiKey,
+  utils::BevyIndigauge,
 };
 
 pub fn maybe_flush_events(mut ig: BevyIndigauge, session_key: Res<SessionApiKey>) {

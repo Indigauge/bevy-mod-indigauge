@@ -11,13 +11,11 @@ use image::{ColorType, ImageEncoder, codecs::png::PngEncoder};
 use crate::{
   SESSION_START_INSTANT,
   api_types::{FeedbackPayload, IdResponse},
+  feedback::components::{CategoryButtonText, CategoryItem, FeedbackPanel, MessageInput, ScreenshotToggleText},
+  feedback::resources::{FeedbackFormState, TakeScreenshot},
   prelude::*,
-  primitives::feedback::{CategoryButtonText, CategoryItem, FeedbackPanel, MessageInput, ScreenshotToggleText},
-  resources::{
-    feedback::{FeedbackFormState, TakeScreenshot},
-    session::SessionApiKey,
-  },
-  sysparam::BevyIndigauge,
+  session::resources::SessionApiKey,
+  utils::BevyIndigauge,
   utils::select,
 };
 
