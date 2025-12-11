@@ -1,6 +1,8 @@
 //! Copied from the Bevy repository and added the Indigauge plugin
 
+use bevy::log::BoxedLayer;
 use bevy::{
+  log::LogPlugin,
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
 };
@@ -56,11 +58,21 @@ enum GameState {
   Paused,
 }
 
+#[cfg(feature = "tracing")]
+pub fn indigauge_layer(_app: &mut App) -> Option<BoxedLayer> {
+  Some(Box::new(bevy_mod_indigauge::tracing::IndigaugeLayer::default()))
+}
+
+#[cfg(not(feature = "tracing"))]
+pub fn indigauge_layer(_app: &mut App) -> Option<BoxedLayer> {
+  None
+}
+
 fn main() {
   App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(LogPlugin {custom_layer: indigauge_layer, ..default()}))
         .insert_state(GameState::default())
-        .add_plugins(IndigaugePlugin::<Score>::default().mode(IndigaugeMode::Live))
+        .add_plugins(IndigaugePlugin::<Score>::default().mode(IndigaugeMode::Dev))
         .insert_resource(Score::default())
         .insert_resource(ClearColor(BACKGROUND_COLOR))
         .add_event::<CollisionEvent>()
@@ -438,6 +450,7 @@ fn play_collision_sound(mut collision_events: EventReader<CollisionEvent>) {
   if !collision_events.is_empty() {
     // This prevents events staying active on the next frame.
     collision_events.clear();
+    info!(message = "Collision occurred", event_type = "collision.hit");
   }
 }
 

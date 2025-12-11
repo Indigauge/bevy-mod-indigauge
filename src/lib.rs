@@ -1,7 +1,6 @@
-use std::time::Instant;
-
 use crossbeam_channel::Sender;
 use once_cell::sync::OnceCell;
+use std::time::Instant;
 
 use crate::resources::events::QueuedEvent;
 
@@ -14,10 +13,15 @@ pub(crate) mod sysparam;
 pub(crate) mod systems;
 pub mod utils;
 
+#[cfg(feature = "tracing")]
+pub mod tracing;
+
 pub(crate) static GLOBAL_TX: OnceCell<Sender<QueuedEvent>> = OnceCell::new();
 pub(crate) static SESSION_START_INSTANT: OnceCell<Instant> = OnceCell::new();
 
 pub mod prelude {
+  
+
   pub use crate::observers::feedback::{switch_state_on_feedback_despawn, switch_state_on_feedback_spawn};
   pub use crate::observers::session::switch_state_after_session_init;
   pub use crate::plugins::IndigaugePlugin;
@@ -33,7 +37,7 @@ pub mod macros {
   #[macro_export]
   macro_rules! enqueue_ig_event {
     ($level: ident, $etype:expr, $metadata:expr) => {
-      const _VALID: &str = $crate::utils::validate_event_type($etype);
+      const _VALID: &str = $crate::utils::validate_event_type_compile_time($etype);
       let _ = $crate::utils::enqueue(stringify!($level), $etype, $metadata, file!(), line!(), module_path!());
     };
   }
